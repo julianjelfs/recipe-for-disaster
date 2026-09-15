@@ -5,10 +5,10 @@ from collections.abc import Callable
 
 import anthropic
 
-from app import config, reports, store
+from app import config, costs, reports, store
 from app.importer.extract import Extract, ExtractError, extract, restore
 from app.importer.fetch import FetchError, canonicalise_url, fetch_html
-from app.importer.normalise import NormaliseError, normalise
+from app.importer.normalise import NormaliseError, Usage, normalise
 from app.importer.validate import ValidationFailed
 from app.schemas import Recipe
 
@@ -28,30 +28,44 @@ def import_url(
     if existing_id is not None:
         return store.get_recipe(conn, existing_id), False
 
-    page: Extract | None = None
+    usage = Usage()
+    recipe_id: int | None = None
     try:
-        page = extract(fetch(source_url), source_url)
-        result = normalise(page, client, config.MODEL)
-    except RECORDED_FAILURES as error:
-        reports.record_failure(conn, source_url=source_url, error=error, extract=page, model=config.MODEL)
-        raise
-
-    try:
-        recipe_id = store.insert_recipe(
-            conn,
-            source_url=source_url,
-            recipe=result.recipe,
-            extract=page,
-            model=config.MODEL,
-            parse_version=config.PARSE_VERSION,
-        )
-    except sqlite3.IntegrityError:
-        # Another request stored the same URL while this one was waiting on Claude.
-        existing_id = store.find_recipe_id(conn, source_url)
-        if existing_id is None:
+        page: Extract | None = None
+        try:
+            page = extract(fetch(source_url), source_url)
+            result = normalise(page, client, config.MODEL, usage)
+        except RECORDED_FAILURES as error:
+            reports.record_failure(conn, source_url=source_url, error=error, extract=page, model=config.MODEL)
             raise
-        return store.get_recipe(conn, existing_id), False
-    return store.get_recipe(conn, recipe_id), True
+
+        try:
+            recipe_id = store.insert_recipe(
+                conn,
+                source_url=source_url,
+                recipe=result.recipe,
+                extract=page,
+                model=config.MODEL,
+                parse_version=config.PARSE_VERSION,
+            )
+        except sqlite3.IntegrityError:
+            # Another request stored the same URL while this one was waiting on Claude.
+            existing_id = store.find_recipe_id(conn, source_url)
+            if existing_id is None:
+                raise
+            return store.get_recipe(conn, existing_id), False
+        return store.get_recipe(conn, recipe_id), True
+    finally:
+        # Every call is paid for, so record it whether or not the import worked.
+        costs.record(
+            conn,
+            purpose="import",
+            source_url=source_url,
+            recipe_id=recipe_id,
+            succeeded=recipe_id is not None,
+            model=config.MODEL,
+            usage=usage,
+        )
 
 
 def renormalise_recipe(conn: sqlite3.Connection, recipe_id: int, client: anthropic.Anthropic) -> Recipe | None:
@@ -64,10 +78,25 @@ def renormalise_recipe(conn: sqlite3.Connection, recipe_id: int, client: anthrop
     if raw is None:
         return None
     page = restore(raw["raw_extract"], raw["raw_text"])
+
+    usage = Usage()
+    succeeded = False
     try:
-        result = normalise(page, client, config.MODEL)
-    except (ValidationFailed, NormaliseError) as error:
-        reports.record_failure(conn, source_url=raw["source_url"], error=error, extract=page, model=config.MODEL)
-        raise
-    store.replace_recipe(conn, recipe_id, result.recipe, model=config.MODEL, parse_version=config.PARSE_VERSION)
+        try:
+            result = normalise(page, client, config.MODEL, usage)
+        except (ValidationFailed, NormaliseError) as error:
+            reports.record_failure(conn, source_url=raw["source_url"], error=error, extract=page, model=config.MODEL)
+            raise
+        store.replace_recipe(conn, recipe_id, result.recipe, model=config.MODEL, parse_version=config.PARSE_VERSION)
+        succeeded = True
+    finally:
+        costs.record(
+            conn,
+            purpose="renormalise",
+            source_url=raw["source_url"],
+            recipe_id=recipe_id,
+            succeeded=succeeded,
+            model=config.MODEL,
+            usage=usage,
+        )
     return store.get_recipe(conn, recipe_id)

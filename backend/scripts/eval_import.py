@@ -15,16 +15,13 @@ import anthropic  # noqa: E402
 from app import config  # noqa: E402
 from app.importer.extract import extract  # noqa: E402
 from app.importer.fetch import canonicalise_url, fetch_html  # noqa: E402
+from app.costs import cost_usd  # noqa: E402
 from app.importer.normalise import NormaliseResult, normalise  # noqa: E402
 from app.schemas import NormalisedRecipe  # noqa: E402
 
-# Claude Haiku 4.5, USD per token.
-INPUT_PRICE = 1 / 1_000_000
-OUTPUT_PRICE = 5 / 1_000_000
-
 
 def cost(result: NormaliseResult) -> float:
-    return result.input_tokens * INPUT_PRICE + result.output_tokens * OUTPUT_PRICE
+    return cost_usd(config.MODEL, result.usage) or 0.0
 
 
 def format_amount(quantity: float | None, quantity_max: float | None, unit: str | None) -> str:

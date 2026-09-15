@@ -95,17 +95,43 @@ class NormaliseError(Exception):
     pass
 
 
+@dataclass
+class Usage:
+    """Tokens used by every Claude call for one import or re-read, retries and failed attempts included."""
+
+    calls: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
+
+    def add(self, api_usage) -> None:
+        self.calls += 1
+        self.input_tokens += api_usage.input_tokens or 0
+        self.output_tokens += api_usage.output_tokens or 0
+        self.cache_creation_input_tokens += getattr(api_usage, "cache_creation_input_tokens", 0) or 0
+        self.cache_read_input_tokens += getattr(api_usage, "cache_read_input_tokens", 0) or 0
+
+
 @dataclass(frozen=True)
 class NormaliseResult:
     recipe: NormalisedRecipe
-    input_tokens: int
-    output_tokens: int
+    usage: Usage
 
 
-def normalise(extract: Extract, client: anthropic.Anthropic, model: str = config.MODEL) -> NormaliseResult:
-    """Ask Claude for a NormalisedRecipe. On validation failure, retry once with the errors."""
+def normalise(
+    extract: Extract,
+    client: anthropic.Anthropic,
+    model: str = config.MODEL,
+    usage: Usage | None = None,
+) -> NormaliseResult:
+    """Ask Claude for a NormalisedRecipe. On validation failure, retry once with the errors.
+
+    Each call's tokens are added to `usage` straight away, so a caller that passes one in
+    still has the counts when this raises.
+    """
+    usage = usage if usage is not None else Usage()
     messages: list[dict] = [{"role": "user", "content": _user_content(extract)}]
-    input_tokens = output_tokens = 0
     for attempt in range(1, MAX_ATTEMPTS + 1):
         response = client.messages.parse(
             model=model,
@@ -114,12 +140,11 @@ def normalise(extract: Extract, client: anthropic.Anthropic, model: str = config
             messages=messages,
             output_format=NormalisedRecipe,
         )
-        input_tokens += response.usage.input_tokens
-        output_tokens += response.usage.output_tokens
+        usage.add(response.usage)
         if response.stop_reason != "end_turn" or response.parsed_output is None:
             raise NormaliseError(f"Claude stopped ({response.stop_reason}) before returning a recipe.")
         try:
-            return NormaliseResult(validate(response.parsed_output), input_tokens, output_tokens)
+            return NormaliseResult(validate(response.parsed_output), usage)
         except ValidationFailed as failure:
             if attempt == MAX_ATTEMPTS:
                 raise

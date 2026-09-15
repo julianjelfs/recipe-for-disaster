@@ -50,7 +50,10 @@ uv run python scripts/reports.py show 3           # the comment, the recipe as f
 uv run python scripts/reports.py retry 3          # what the current prompt makes of the same page data
 uv run python scripts/reports.py retry 3 --refetch
 uv run python scripts/reports.py resolve 3 "Sizes like 5cm now stay in the ingredient name"
+uv run python scripts/reports.py costs            # what Claude has cost so far
 ```
+
+Every import and re-read that calls Claude stores its token counts and cost, including failed attempts, since those are paid for too. `costs` totals them at list prices, from `backend/app/costs.py`. It's an estimate: check the Anthropic console for the actual bill.
 
 To work through a report: `show` it to see what went wrong, change the prompt or the code, `retry` to check the fix, add a test for the case, then `resolve` it.
 
@@ -75,6 +78,7 @@ To work through a report: `show` it to see what went wrong, change the prompt or
 | 15 | No ingredient whose name gives a size in cm or mm is stored with that size as its weight or volume. | `test_validate.py::test_inv15_size_in_name_is_not_stored_as_a_weight` |
 | 16 | Any non-API path that isn't a file returns the app's index.html; paths under /api never do. | `test_ui.py::test_inv16_client_routes_get_the_app`, `test_inv16_api_paths_never_get_the_app` |
 | 17 | A link shared to the app reaches /add as ?url= or inside ?text=, and the add page finds it in either. | `frontend/src/lib/share.test.ts` "invariant 17: …" (two tests) |
+| 18 | Every import or re-read that calls Claude records its token counts and cost, whether it succeeds or fails. | `test_costs.py::test_inv18_successful_import_records_its_cost`, `test_inv18_failed_import_records_both_attempts`, `test_inv18_a_crash_before_the_retry_still_records_the_first_call`, `test_inv18_renormalise_records_its_cost` |
 
 ## Running it as a service
 

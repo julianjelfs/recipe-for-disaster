@@ -1,4 +1,4 @@
-"""Review bad imports: recipes someone flagged and imports that failed.
+"""Review bad imports: recipes someone flagged and imports that failed. Also shows what Claude has cost.
 
   uv run python scripts/reports.py                      list open reports
   uv run python scripts/reports.py --all                include resolved reports
@@ -6,8 +6,10 @@
   uv run python scripts/reports.py retry ID             run the stored page data through the current prompt
   uv run python scripts/reports.py retry ID --refetch   fetch and extract the page again first
   uv run python scripts/reports.py resolve ID "what fixed it"
+  uv run python scripts/reports.py costs                spending on Claude so far
 
-retry saves nothing. It shows what an import would produce now, so a fix can be checked against the report.
+retry saves nothing and isn't counted in costs. It shows what an import would produce now,
+so a fix can be checked against the report.
 """
 
 import argparse
@@ -19,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import anthropic  # noqa: E402
 
-from app import config, db, reports  # noqa: E402
+from app import config, costs, db, reports  # noqa: E402
 from app.importer.extract import extract, restore  # noqa: E402
 from app.importer.fetch import fetch_html  # noqa: E402
 from app.importer.normalise import normalise  # noqa: E402
@@ -85,6 +87,32 @@ def resolve_command(conn, report_id: int, resolution: str) -> None:
         print(f"#{report_id} was already resolved.")
 
 
+def costs_command(conn) -> None:
+    spent = costs.spending(conn)
+    if spent.imports + spent.renormalises + spent.failures == 0:
+        print("No Claude calls recorded yet.")
+        return
+    print("Claude spending, at list prices in USD")
+    def count(n: int, noun: str) -> str:
+        return f"{n} {noun}{'' if n == 1 else 's'}"
+
+    print(
+        f"  total          ${spent.total_usd:.4f}"
+        f"  ({count(spent.imports, 'import')}, {count(spent.renormalises, 're-read')}, {spent.failures} failed)"
+    )
+    print(f"  last 30 days   ${spent.last_30_days_usd:.4f}")
+    if spent.median_import_usd is not None:
+        print(f"  per import     median ${spent.median_import_usd:.4f}, average ${spent.average_import_usd:.4f}")
+    if spent.unpriced:
+        print(f"  {spent.unpriced} used a model with no price in app/costs.py and aren't in these totals")
+
+    print("\nMost expensive:")
+    for row in costs.most_expensive(conn):
+        outcome = row["purpose"] if row["succeeded"] else f"{row['purpose']}, failed"
+        print(f"  ${row['cost_usd']:.4f}  {row['created_at'][:10]}  {outcome}  {row['source_url']}")
+        print(f"             {row['calls']} call(s), {row['input_tokens']:,} tokens in, {row['output_tokens']:,} out")
+
+
 def _get(conn, report_id: int):
     row = reports.get_report(conn, report_id)
     if row is None:
@@ -103,6 +131,7 @@ def main() -> None:
     resolve = commands.add_parser("resolve")
     resolve.add_argument("id", type=int)
     resolve.add_argument("resolution")
+    commands.add_parser("costs")
     args = parser.parse_args()
 
     conn = db.connect(config.DB_PATH)
@@ -114,6 +143,8 @@ def main() -> None:
             retry_command(conn, args.id, args.refetch)
         elif args.command == "resolve":
             resolve_command(conn, args.id, args.resolution)
+        elif args.command == "costs":
+            costs_command(conn)
         else:
             list_command(conn, args.all)
     finally:
