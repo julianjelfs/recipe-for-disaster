@@ -1,0 +1,17 @@
+.DS_Store
+.env
+
+# backend
+backend/.venv/
+__pycache__/
+.pytest_cache/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+backend/app/static/
+
+# frontend
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/

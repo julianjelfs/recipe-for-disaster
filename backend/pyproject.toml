@@ -1,0 +1,25 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "anthropic>=1.6.0",
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "pydantic>=2.13.5",
+    "python-dotenv>=1.2.3",
+    "recipe-scrapers>=15.12.0",
+    "trafilatura>=2.2.0",
+    "uvicorn[standard]>=0.53.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

@@ -1,0 +1,11 @@
+# One URL per line. UK metric sites first, then US sites that measure in cups.
+https://www.bbcgoodfood.com/recipes/easy-chocolate-cake
+https://www.bbcgoodfood.com/recipes/best-spaghetti-bolognese-recipe
+https://www.bbc.co.uk/food/recipes/easy_chocolate_cake_31070
+https://www.jamieoliver.com/recipes/chicken/chicken-tikka-masala/
+https://www.recipetineats.com/chicken-stir-fry/
+https://www.recipetineats.com/banana-bread/
+https://www.budgetbytes.com/homemade-meatballs/
+https://cookieandkate.com/best-lentil-soup-recipe/
+https://www.kingarthurbaking.com/recipes/classic-sandwich-bread-recipe
+https://sallysbakingaddiction.com/best-banana-bread-recipe/

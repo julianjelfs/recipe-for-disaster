@@ -1,0 +1,134 @@
+:root {
+	color-scheme: light dark;
+	--bg: #fbfaf7;
+	--card: #ffffff;
+	--fg: #1f1d1a;
+	--muted: #6b665e;
+	--line: #e4e0d8;
+	--accent: #b4442b;
+	--accent-fg: #ffffff;
+	--danger-bg: #fbeae6;
+	--page-width: 60rem;
+	font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+	line-height: 1.5;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #171614;
+		--card: #211f1c;
+		--fg: #ece8e1;
+		--muted: #a39d93;
+		--line: #33302b;
+		--accent: #e5775c;
+		--accent-fg: #171614;
+		--danger-bg: #3a211b;
+	}
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--fg);
+}
+
+main {
+	max-width: var(--page-width);
+	margin: 0 auto;
+	padding: 1rem;
+}
+
+a {
+	color: var(--accent);
+}
+
+h1,
+h2,
+h3 {
+	line-height: 1.2;
+}
+
+input,
+button,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+}
+
+input,
+select,
+textarea {
+	padding: 0.6rem 0.75rem;
+	border: 1px solid var(--line);
+	border-radius: 0.5rem;
+	background: var(--card);
+}
+
+button {
+	padding: 0.6rem 1rem;
+	border: 0;
+	border-radius: 0.5rem;
+	background: var(--accent);
+	color: var(--accent-fg);
+	font-weight: 600;
+	cursor: pointer;
+}
+
+button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+img {
+	max-width: 100%;
+}
+
+/* A link that looks like the primary button. */
+a.button {
+	display: inline-block;
+	padding: 0.6rem 1rem;
+	border-radius: 0.5rem;
+	background: var(--accent);
+	color: var(--accent-fg);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+button.secondary,
+a.button.secondary {
+	border: 1px solid var(--line);
+	background: var(--card);
+	color: var(--fg);
+}
+
+button.danger {
+	background: #b3261e;
+	color: #ffffff;
+}
+
+/* A button that looks like a link. */
+button.link {
+	padding: 0;
+	background: none;
+	color: var(--accent);
+	font-weight: normal;
+	text-decoration: underline;
+}
+
+.error {
+	margin-top: 1rem;
+	padding: 0.75rem 1rem;
+	border-radius: 0.5rem;
+	background: var(--danger-bg);
+}
+
+.error p {
+	margin: 0;
+}

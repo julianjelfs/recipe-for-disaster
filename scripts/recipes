@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# Control the always-on Recipe for Disaster service.
+set -euo pipefail
+
+LABEL="com.julian.recipe-for-disaster"
+DOMAIN="gui/$(id -u)"
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+LOG="$HOME/Library/Logs/recipe-for-disaster.log"
+PORT=8010
+# HTTPS port on the tailnet. Triad Trainer has 8443.
+SERVE_PORT=8445
+ROOT="$(cd "$(dirname "$(readlink "${BASH_SOURCE[0]}" || echo "${BASH_SOURCE[0]}")")/.." && pwd)"
+
+machine() {
+  tailscale status --json 2>/dev/null | sed -n 's/.*"DNSName": *"\([^"]*\)\..*/\1/p' | head -1
+}
+
+# Read all of `tailscale serve status` before matching: piped straight into `grep -q` under
+# pipefail, the check fails now and then when another rule follows this one (grep stops
+# reading, tailscale gets SIGPIPE).
+served() {
+  local name config
+  name="$(machine)"
+  config="$(tailscale serve status 2>/dev/null || true)"
+  [ -n "$name" ] && grep -q "^https://$name:$SERVE_PORT " <<<"$config"
+}
+
+url() {
+  if served; then
+    echo "https://$(machine):$SERVE_PORT"
+  else
+    echo "http://127.0.0.1:$PORT"
+  fi
+}
+
+running() { launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1; }
+
+case "${1:-open}" in
+  open)    open "$(url)" ;;
+  url)     url ;;
+  start)   launchctl bootstrap "$DOMAIN" "$PLIST" 2>/dev/null || launchctl kickstart "$DOMAIN/$LABEL"; echo "started" ;;
+  stop)    launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true; echo "stopped" ;;
+  restart) launchctl kickstart -k "$DOMAIN/$LABEL"; echo "restarted" ;;
+  logs)    tail -n "${2:-40}" -f "$LOG" ;;
+  rebuild)
+    # After changing code: new dependencies on either side, a new UI, and new API code.
+    echo "syncing backend dependencies..."
+    (cd "$ROOT/backend" && uv sync --quiet)
+    echo "installing frontend dependencies..."
+    (cd "$ROOT/frontend" && pnpm install --silent)
+    echo "building frontend..."
+    (cd "$ROOT/frontend" && pnpm run build)
+    # The API runs without --reload, so backend changes (including new migrations) only land on a restart.
+    if running; then
+      launchctl kickstart -k "$DOMAIN/$LABEL"
+      echo "done, service restarted. Reload the page."
+    else
+      echo "done. Reload the page once the service is started."
+    fi
+    ;;
+  serve)
+    # Config written while the tailnet had no TLS certs sticks around but never
+    # starts a listener, so trust a reply rather than the presence of config.
+    if served; then
+      if curl -sf -m 8 "$(url)/api/health" >/dev/null 2>&1; then
+        echo "already served at $(url)"; exit 0
+      fi
+      # Only remove this app's rule. `tailscale serve reset` would also remove Triad Trainer's.
+      echo "stale serve config on :$SERVE_PORT, removing it..."
+      tailscale serve --https=$SERVE_PORT off >/dev/null 2>&1 || true
+      sleep 1
+    fi
+    # Without TLS certs enabled for the tailnet this hangs silently rather than
+    # failing, so give it a deadline and report the real reason.
+    tailscale serve --bg --https=$SERVE_PORT "$PORT" >/dev/null 2>&1 &
+    serve_pid=$!
+    for _ in $(seq 1 20); do
+      served && break
+      sleep 0.5
+    done
+    if served; then
+      echo "published at $(url)"
+    else
+      kill "$serve_pid" 2>/dev/null || true
+      echo "could not publish to the tailnet."
+      echo
+      echo "  $(tailscale cert --cert-file /dev/null --key-file /dev/null "$(machine)" 2>&1 | tail -1)"
+      echo
+      echo "  If that says TLS certs are unsupported, enable HTTPS for your"
+      echo "  tailnet: admin console -> DNS -> HTTPS Certificates -> Enable."
+      echo "  Then run: recipes serve"
+      exit 1
+    fi
+    ;;
+  unserve)
+    tailscale serve --https=$SERVE_PORT off >/dev/null 2>&1 || true
+    echo "removed from the tailnet"
+    ;;
+  status)
+    if running; then
+      pid="$(launchctl print "$DOMAIN/$LABEL" | sed -n 's/^[[:space:]]*pid = \([0-9]*\).*/\1/p')"
+      echo "service : running${pid:+ (pid $pid)}"
+    else
+      echo "service : not running"
+    fi
+    if curl -sf -m 2 "http://127.0.0.1:$PORT/api/health" >/dev/null; then
+      echo "api     : responding on 127.0.0.1:$PORT"
+    else
+      echo "api     : not responding on 127.0.0.1:$PORT"
+    fi
+    if served; then
+      if curl -sf -m 8 "$(url)/api/health" >/dev/null 2>&1; then
+        echo "tailnet : reachable on :$SERVE_PORT"
+      else
+        echo "tailnet : configured on :$SERVE_PORT but not answering (try: recipes serve)"
+      fi
+    else
+      echo "tailnet : not served"
+    fi
+    echo "url     : $(url)"
+    ;;
+  *)
+    cat <<USAGE
+recipes: the family recipe library
+
+  recipes            open it in a browser
+  recipes status     is it running, and where
+  recipes url        print the URL
+  recipes rebuild    after changing code: install deps, build the UI, restart
+  recipes serve      publish to your tailnet over HTTPS
+  recipes unserve    remove it from your tailnet
+  recipes logs [n]   follow the log
+  recipes start|stop|restart
+USAGE
+    ;;
+esac
