@@ -71,7 +71,7 @@ To work through a report: `show` it to see what went wrong, change the prompt or
 | 8 | Scaling servings by factor k multiplies every non-null quantity by k and leaves null quantities null. | `frontend/src/lib/scale.test.ts` "invariant 8: multiplies every non-null quantity by k and leaves null quantities null" |
 | 9 | Cooking mode "next" on the last step does not advance past it; "back" on the first does not go below it. | `frontend/src/lib/cook.test.ts` "invariant 9: …" (three tests) |
 | 10 | No temperature in stored step text is in °F. | `test_validate.py::test_inv10_fahrenheit_is_converted`, `test_inv10_validate_removes_fahrenheit_from_steps` |
-| 11 | No stored step text mentions cups, ounces, pounds or inches. | `test_validate.py::test_inv11_steps_have_no_us_measures`, `test_inv11_words_containing_measures_are_allowed` |
+| 11 | No stored step text mentions cups, ounces or pounds. | `test_validate.py::test_inv11_steps_have_no_us_measures`, `test_inv11_words_containing_measures_are_allowed` |
 | 12 | A flag keeps the recipe as it was when flagged, even after the recipe is edited or deleted. | `test_reports.py::test_inv12_flag_keeps_recipe_as_it_was` |
 | 13 | An import that fails after its URL is accepted is recorded with the URL, the error and any extracted data. | `test_reports.py::test_inv13_validation_failure_is_recorded`, `test_inv13_fetch_failure_is_recorded` |
 | 14 | Each recipe has exactly one search index row matching its current content, and a deleted recipe has none. | `test_library.py::test_inv14_search_index_follows_every_change` |
@@ -79,6 +79,8 @@ To work through a report: `show` it to see what went wrong, change the prompt or
 | 16 | Any non-API path that isn't a file returns the app's index.html; paths under /api never do. | `test_ui.py::test_inv16_client_routes_get_the_app`, `test_inv16_api_paths_never_get_the_app` |
 | 17 | A link shared to the app reaches /add as ?url= or inside ?text=, and the add page finds it in either. | `frontend/src/lib/share.test.ts` "invariant 17: …" (two tests) |
 | 18 | Every import or re-read that calls Claude records its token counts and cost, whether it succeeds or fails. | `test_costs.py::test_inv18_successful_import_records_its_cost`, `test_inv18_failed_import_records_both_attempts`, `test_inv18_a_crash_before_the_retry_still_records_the_first_call`, `test_inv18_renormalise_records_its_cost` |
+| 19 | The shopping list includes every ingredient exactly once, and a merged line's quantity is the sum of the quantities it replaces. | `frontend/src/lib/shopping.test.ts` "invariant 19: …" (two tests) |
+| 20 | Tin, pan, dish and tray sizes in stored step text and equipment are in inches. | `test_validate.py::test_inv20_tin_sizes_are_in_inches`, `test_inv20_validate_converts_steps_and_equipment` |
 
 ## Running it as a service
 

@@ -16,15 +16,29 @@ _FAHRENHEIT = re.compile(
     re.IGNORECASE,
 )
 _ENDS_WITH_CELSIUS = re.compile(r"\d\s*(?:°|º|degrees?\s*)?C(?:elsius)?(?:\s*fan)?\s*$", re.IGNORECASE)
-# An amount followed by a US measure: "1 3/4 cups", "8 oz", "2 lbs", "1 stick of butter", "8 inch", '8"'.
+# An amount followed by a US measure: "1 3/4 cups", "8 oz", "2 lbs", "1 stick of butter".
 _US_MEASURE = re.compile(
-    r"(?:\d|½|¼|¾|⅓|⅔)\s*"
-    r"(?:(?:cups?|fl\.?\s*oz|oz|ounces?|lbs?|pounds?|inch(?:es)?|sticks? of butter)\b|[\"″])",
+    r"(?:\d|½|¼|¾|⅓|⅔)\s*(?:cups?|fl\.?\s*oz|oz|ounces?|lbs?|pounds?|sticks? of butter)\b",
     re.IGNORECASE,
 )
 # A size given in the ingredient name: "5cm piece fresh ginger".
 _SIZE_IN_NAME = re.compile(r"(\d+(?:\.\d+)?)\s*(?:cm|mm)\b", re.IGNORECASE)
 _WEIGHT_AND_VOLUME_UNITS = {"g", "kg", "ml", "l"}
+
+# Words that can sit between a size and "tin": "20cm round sandwich tins". Anything else
+# ("1cm thick in the dish", "5cm apart on a baking tray") means the size isn't the tin's.
+_TIN_DESCRIPTORS = (
+    r"(?:round|square|rectangular|deep|shallow|loose-bottomed|springform|sandwich|cake|loaf|roasting"
+    r"|baking|brownie|traybake|non-stick|pie|tart|flan|ovenproof|gratin|pudding|bundt|muffin|lined|greased)"
+)
+# "20cm round tin", "30 x 20cm roasting tin", "21.5 x 11.5 x 7cm loaf tin".
+_TIN_SIZE = re.compile(
+    rf"(?P<size>\d+(?:\.\d+)?(?:\s*cm)?(?:\s*[x×]\s*\d+(?:\.\d+)?(?:\s*cm)?)*)"
+    rf"(?P<rest>(?:\s+{_TIN_DESCRIPTORS})*\s+(?:tins?|pans?|dish(?:es)?|trays?)\b)",
+    re.IGNORECASE,
+)
+# '8"', "8 inch", "9-inch".
+_INCHES = re.compile(r"(\d+(?:\.\d+)?)[\s-]*(?:inch(?:es)?\b|\"|″)", re.IGNORECASE)
 
 
 def fahrenheit_to_celsius(text: str) -> str:
@@ -37,6 +51,26 @@ def fahrenheit_to_celsius(text: str) -> str:
         return f"{match.group('sep') or ''}{celsius}C{match.group('close') or ''}"
 
     return _FAHRENHEIT.sub(replace, text)
+
+
+def tin_sizes_in_inches(text: str) -> str:
+    """Tin, pan, dish and tray sizes in inches, the way UK bakers buy them.
+
+    "20cm round tin" -> "8in round tin", '8" loaf tin' -> "8in loaf tin". Rounds to the nearest
+    half inch. Other sizes ("2cm pieces", "5cm apart") stay in cm.
+    """
+
+    def to_inches(cm: re.Match[str]) -> str:
+        return f"{round(float(cm.group(0)) / 2.54 * 2) / 2:g}"
+
+    def replace(match: re.Match[str]) -> str:
+        size = match.group("size")
+        if "cm" not in size.lower():
+            return match.group(0)
+        numbers = re.sub(r"\d+(?:\.\d+)?", to_inches, re.sub(r"\s*cm", "", size, flags=re.IGNORECASE))
+        return f"{numbers}in{match.group('rest')}"
+
+    return _TIN_SIZE.sub(replace, _INCHES.sub(r"\1in", text))
 
 
 def tidy_name(name: str, preparation: str | None) -> tuple[str, str | None]:
@@ -134,11 +168,12 @@ def validate(recipe: NormalisedRecipe) -> NormalisedRecipe:
     steps = [
         step.model_copy(
             update={
-                "text": fahrenheit_to_celsius(step.text.strip()),
+                "text": tin_sizes_in_inches(fahrenheit_to_celsius(step.text.strip())),
                 # Deduplicated, in ingredient-list order.
                 "ingredient_keys": [key for key in keys if key in set(step.ingredient_keys)],
             }
         )
         for step in recipe.steps
     ]
-    return recipe.model_copy(update={"ingredients": ingredients, "steps": steps})
+    equipment = [tin_sizes_in_inches(item) for item in recipe.equipment]
+    return recipe.model_copy(update={"ingredients": ingredients, "steps": steps, "equipment": equipment})

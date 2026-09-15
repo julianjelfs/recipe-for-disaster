@@ -14,4 +14,4 @@ MODEL = os.environ.get("RECIPE_MODEL") or "claude-haiku-4-5"
 UI_DIR = Path(os.environ.get("RECIPE_UI_DIR") or BACKEND_DIR.parent / "frontend" / "build")
 
 # Bump when the normalisation prompt or schema changes, so old recipes can be found and renormalised.
-PARSE_VERSION = 1
+PARSE_VERSION = 2

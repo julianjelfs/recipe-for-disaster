@@ -3,7 +3,7 @@ import sqlite3
 
 import pytest
 
-from app.importer.validate import ValidationFailed, fahrenheit_to_celsius, tidy_name, validate
+from app.importer.validate import ValidationFailed, fahrenheit_to_celsius, tidy_name, tin_sizes_in_inches, validate
 from app.schemas import UK_UNITS, NormalisedIngredient
 from tests.helpers import ingredient, make_recipe, step
 
@@ -120,12 +120,10 @@ def test_inv10_validate_removes_fahrenheit_from_steps():
         ("Use a 2 lb loaf tin.", "2 lb"),
         ("Melt 1 stick of butter.", "1 stick of butter"),
         ("Pour in ½ cup of milk.", "½ cup"),
-        ('Shape the dough into an 8" log.', '8"'),
-        ("Place in a lightly greased 8½ × 4½ inch loaf pan.", "½ inch"),
     ],
 )
 def test_inv11_steps_have_no_us_measures(text, measure):
-    """Invariant 11: no stored step text mentions cups, ounces, pounds or inches."""
+    """Invariant 11: no stored step text mentions cups, ounces or pounds."""
     with pytest.raises(ValidationFailed) as failure:
         validate(make_recipe(steps=[step(text, [])]))
     assert repr(measure) in failure.value.errors[0]
@@ -150,3 +148,36 @@ def test_inv15_size_in_name_is_not_stored_as_a_weight():
     )
     cleaned = validate(recipe)
     assert [(i.quantity, i.unit) for i in cleaned.ingredients] == [(1.0, None), (1.0, None), (100.0, "g"), (5.0, "piece")]
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("Grease and line two 20cm round sandwich tins.", "Grease and line two 8in round sandwich tins."),
+        ("Line a 30 x 20cm roasting tin.", "Line a 12 x 8in roasting tin."),
+        ("Press into a 21.5 x 11.5 x 7cm loaf tin.", "Press into a 8.5 x 4.5 x 3in loaf tin."),
+        ("Use a 23 cm springform tin.", "Use a 9in springform tin."),
+        ("Spread over a 30x40cm baking tray.", "Spread over a 12x15.5in baking tray."),
+        ('Put the log in an 8" loaf tin.', "Put the log in an 8in loaf tin."),
+        ("Bake in a 9-inch pie dish.", "Bake in a 9in pie dish."),
+        ("Cut into 2cm pieces and put them in the tin.", "Cut into 2cm pieces and put them in the tin."),
+        ("Roll out to 1cm thick in the dish.", "Roll out to 1cm thick in the dish."),
+        ("Space them 5cm apart on a baking tray.", "Space them 5cm apart on a baking tray."),
+        ("Use 2 x 450g loaf tins.", "Use 2 x 450g loaf tins."),
+    ],
+)
+def test_inv20_tin_sizes_are_in_inches(raw, expected):
+    """Invariant 20: tin, pan, dish and tray sizes in stored step text and equipment are in inches."""
+    assert tin_sizes_in_inches(raw) == expected
+
+
+def test_inv20_validate_converts_steps_and_equipment():
+    """Invariant 20: tin, pan, dish and tray sizes in stored step text and equipment are in inches."""
+    cleaned = validate(
+        make_recipe(
+            steps=[step("Butter and line two 20cm sandwich tins.", [])],
+            equipment=["20cm sandwich tins", "stand mixer"],
+        )
+    )
+    assert cleaned.steps[0].text == "Butter and line two 8in sandwich tins."
+    assert cleaned.equipment == ["8in sandwich tins", "stand mixer"]

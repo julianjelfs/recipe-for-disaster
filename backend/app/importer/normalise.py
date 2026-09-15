@@ -70,9 +70,11 @@ and quantities that just repeat the ingredient list.
 - Give one method. Drop alternative methods (stovetop, slow cooker, air fryer, bread machine versions) \
 unless the page offers nothing else.
 - Oven temperatures in Celsius with fan and gas, e.g. "Heat the oven to 180C (160C fan, gas 4)".
-- Never write cups, ounces, pounds, inches or Fahrenheit in a step. Convert inches to cm \
-(1 inch = 2.5 cm, so an 8x4 inch loaf pan is a 20x10cm loaf tin). Convert other amounts like \
-ingredients, or leave the amount out when the ingredient list already has it.
+- Never write cups, ounces, pounds or Fahrenheit in a step. Convert them like ingredients, \
+or leave the amount out when the ingredient list already has it.
+- Give tin, pan, dish and tray sizes in inches, the way UK bakers buy them: "20cm round tin" -> \
+"8in round tin", "30 x 20cm roasting tin" -> "12 x 8in roasting tin", "8x4 inch loaf pan" -> \
+"8 x 4in loaf tin". Other sizes, such as "cut into 2cm pieces", stay in cm.
 - `timer_seconds` is an unattended wait of 2 minutes or more: baking, simmering, resting, rising, chilling. \
 For a range use the lower end, when the cook should first check ("bake for 20-25 mins" -> 1200). \
 Null for hands-on work such as creaming, kneading, whisking or stir-frying.
@@ -86,7 +88,7 @@ Null for hands-on work such as creaming, kneading, whisking or stir-frying.
 4 demanding technique or tight timing (tempering chocolate, soufflé, laminated dough); \
 5 professional level, multi-day, or many components.
 - `diet`: only labels the recipe actually meets.
-- `equipment`: notable items beyond basic pans, bowls and knives ("stand mixer", "20cm sandwich tins", "wok").
+- `equipment`: notable items beyond basic pans, bowls and knives ("stand mixer", "8in sandwich tins", "wok").
 - `techniques`: short lower-case labels ("stir-frying", "creaming", "braising").
 """
 
