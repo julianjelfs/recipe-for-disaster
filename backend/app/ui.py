@@ -1,11 +1,15 @@
 """Serve the built frontend from the API, so the installed app is one process on one port."""
 
+import mimetypes
 from pathlib import Path
 
 from starlette.exceptions import HTTPException
 from starlette.responses import Response
 from starlette.staticfiles import StaticFiles
 from starlette.types import Scope
+
+# Python doesn't know .webmanifest, and would serve the PWA manifest as text/plain.
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 
 class UiFiles(StaticFiles):

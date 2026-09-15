@@ -3,9 +3,9 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { ApiError, importRecipe } from '$lib/api';
+	import { sharedUrl } from '$lib/share';
 
-	// Share targets and shortcuts pass the link as ?url=, or sometimes inside ?text=.
-	const shared = page.url.searchParams.get('url') ?? page.url.searchParams.get('text')?.match(/https?:\/\/\S+/)?.[0] ?? '';
+	const shared = sharedUrl(page.url.searchParams);
 
 	let url = $state(shared);
 	let busy = $state(false);
@@ -84,16 +84,5 @@
 
 	.hint {
 		color: var(--muted);
-	}
-
-	.error {
-		margin-top: 1rem;
-		padding: 0.75rem 1rem;
-		border-radius: 0.5rem;
-		background: var(--danger-bg);
-	}
-
-	.error p {
-		margin: 0;
 	}
 </style>

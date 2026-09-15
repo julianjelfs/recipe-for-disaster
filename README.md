@@ -74,6 +74,7 @@ To work through a report: `show` it to see what went wrong, change the prompt or
 | 14 | Each recipe has exactly one search index row matching its current content, and a deleted recipe has none. | `test_library.py::test_inv14_search_index_follows_every_change` |
 | 15 | No ingredient whose name gives a size in cm or mm is stored with that size as its weight or volume. | `test_validate.py::test_inv15_size_in_name_is_not_stored_as_a_weight` |
 | 16 | Any non-API path that isn't a file returns the app's index.html; paths under /api never do. | `test_ui.py::test_inv16_client_routes_get_the_app`, `test_inv16_api_paths_never_get_the_app` |
+| 17 | A link shared to the app reaches /add as ?url= or inside ?text=, and the add page finds it in either. | `frontend/src/lib/share.test.ts` "invariant 17: …" (two tests) |
 
 ## Running it as a service
 
@@ -93,6 +94,15 @@ recipes logs
 `recipes serve` publishes it to your tailnet over HTTPS at `https://<this-machine>.<tailnet>.ts.net:8445`. Triad Trainer has 8443. The API stays bound to loopback and Tailscale does the proxying, so nothing is exposed to the public internet. Cooking mode needs HTTPS to keep a phone's screen on.
 
 `recipes serve` and `recipes unserve` only touch this app's rule on 8445, and `triad-trainer` only touches its own on 8443, so either can be re-published without affecting the other.
+
+## Installing on a phone
+
+The app is a PWA. With Tailscale connected on the phone, open `https://<this-machine>.<tailnet>.ts.net:8445`, then:
+
+- **Android (Chrome):** menu, then "Install app" or "Add to home screen". Once installed, Recipes appears in the share sheet, so sharing a recipe page from the browser imports it.
+- **iPhone (Safari):** Share, then "Add to Home Screen". iOS doesn't let web apps receive shares. A Shortcut that opens `…:8445/add?url=` followed by the shared link does the same job.
+
+The icons come from one drawing in `frontend/scripts/icons.mjs`. After changing it, run `node scripts/icons.mjs` in `frontend/` and commit what it writes to `static/`.
 
 ## Known limits
 

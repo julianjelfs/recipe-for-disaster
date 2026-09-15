@@ -9,6 +9,8 @@ from app.ui import UiFiles
 def http(tmp_path):
     (tmp_path / "index.html").write_text("<!doctype html><title>app</title>")
     (tmp_path / "robots.txt").write_text("User-agent: *")
+    (tmp_path / "manifest.webmanifest").write_text('{"name": "Recipe for Disaster"}')
+    (tmp_path / "service-worker.js").write_text("self.addEventListener('fetch', () => {})")
     immutable = tmp_path / "_app" / "immutable"
     immutable.mkdir(parents=True)
     (immutable / "entry.abc123.js").write_text("console.log('hi')")
@@ -44,3 +46,10 @@ def test_inv16_api_paths_never_get_the_app(http):
 def test_only_fingerprinted_files_are_cached_forever(http):
     assert http.get("/_app/immutable/entry.abc123.js").headers["cache-control"] == "public, max-age=31536000, immutable"
     assert http.get("/robots.txt").headers["cache-control"] == "no-cache"
+    assert http.get("/manifest.webmanifest").headers["cache-control"] == "no-cache"
+
+
+def test_manifest_has_the_manifest_content_type(http):
+    response = http.get("/manifest.webmanifest")
+    assert response.headers["content-type"].startswith("application/manifest+json")
+    assert response.json() == {"name": "Recipe for Disaster"}

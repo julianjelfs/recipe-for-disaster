@@ -1,6 +1,5 @@
 <script lang="ts">
 	import '$lib/app.css';
-	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
 
 	let { children } = $props();
@@ -9,13 +8,12 @@
 	const cooking = $derived(page.route.id === '/r/[id]/cook');
 </script>
 
-<svelte:head>
-	<link rel="icon" href={favicon} />
-</svelte:head>
-
 {#if !cooking}
 	<header class="site">
-		<a class="brand" href="/">Recipe for Disaster</a>
+		<a class="brand" href="/">
+			<img src="/favicon.svg" alt="" width="28" height="28" />
+			Recipe for Disaster
+		</a>
 		<nav>
 			<a href="/add">Add recipe</a>
 		</nav>
@@ -29,7 +27,7 @@
 <style>
 	.site {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		justify-content: space-between;
 		gap: 1rem;
 		max-width: var(--page-width);
@@ -39,8 +37,15 @@
 	}
 
 	.brand {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
 		color: var(--fg);
 		font-weight: 700;
 		text-decoration: none;
+	}
+
+	.brand img {
+		border-radius: 0.4rem;
 	}
 </style>
