@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import ServingsControl from '$lib/ServingsControl.svelte';
+	import ShoppingList from '$lib/ShoppingList.svelte';
 	import { deleteRecipe, flagRecipe, renormaliseRecipe, toApiError, type ApiError, type Ingredient } from '$lib/api';
 	import { formatAmount, formatMinutes } from '$lib/format';
 	import { parseScale, scaleAmount } from '$lib/scale';
@@ -116,6 +117,7 @@
 
 		<div class="actions">
 			<a class="button" href={cookHref}>Start cooking</a>
+			<ShoppingList recipeId={recipe.id} title={recipe.title} ingredients={recipe.ingredients} {scale} />
 			<a class="button secondary" href="/r/{recipe.id}/edit">Edit</a>
 			<button
 				class="secondary"
