@@ -37,6 +37,11 @@
 		border-bottom: 1px solid var(--line);
 	}
 
+	nav {
+		display: flex;
+		gap: 1.25rem;
+	}
+
 	.brand {
 		display: flex;
 		align-items: center;
