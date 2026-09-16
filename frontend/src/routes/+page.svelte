@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import IngredientFilter from '$lib/IngredientFilter.svelte';
 	import RecipeImage from '$lib/RecipeImage.svelte';
 	import { formatMinutes } from '$lib/format';
 
@@ -12,7 +13,6 @@
 	const filtering = $derived([...params.keys()].length > 0);
 
 	let text = $state(page.url.searchParams.get('q') ?? '');
-	let ingredientInput = $state('');
 	let debounce: ReturnType<typeof setTimeout> | undefined;
 
 	function splitParam(name: string): string[] {
@@ -35,15 +35,8 @@
 		debounce = setTimeout(() => update({ q: text.trim() || null }), 250);
 	}
 
-	function addIngredient(event: SubmitEvent) {
-		event.preventDefault();
-		const name = ingredientInput.trim().toLowerCase();
-		if (name && !has.includes(name)) update({ has: [...has, name].join(',') });
-		ingredientInput = '';
-	}
-
-	function removeIngredient(name: string) {
-		update({ has: has.filter((item) => item !== name).join(',') || null });
+	function setIngredients(next: string[]) {
+		update({ has: next.join(',') || null });
 	}
 
 	function toggleTag(value: string) {
@@ -71,15 +64,7 @@
 />
 
 <div class="filters">
-	<form class="ingredient-filter" onsubmit={addIngredient}>
-		<input list="ingredient-names" placeholder="Has ingredient" aria-label="Filter by ingredient" bind:value={ingredientInput} />
-		<datalist id="ingredient-names">
-			{#each data.facets.ingredients as item (item.value)}
-				<option value={item.value}>{item.count}</option>
-			{/each}
-		</datalist>
-		<button>Add</button>
-	</form>
+	<IngredientFilter ingredients={data.facets.ingredients} chosen={has} onchange={setIngredients} />
 
 	<select aria-label="Maximum total time" value={params.get('max_total') ?? ''} onchange={(e) => update({ max_total: e.currentTarget.value })}>
 		<option value="">Any time</option>
@@ -122,11 +107,8 @@
 	</select>
 </div>
 
-{#if has.length || data.facets.diet.length || data.facets.tags.length}
+{#if data.facets.diet.length || data.facets.tags.length}
 	<div class="chips">
-		{#each has as name (name)}
-			<button class="chip on" onclick={() => removeIngredient(name)} aria-label="Stop filtering by {name}">{name} ✕</button>
-		{/each}
 		{#each [...data.facets.diet, ...data.facets.tags] as tag (tag.value)}
 			<button class="chip" class:on={tags.includes(tag.value)} aria-pressed={tags.includes(tag.value)} onclick={() => toggleTag(tag.value)}>
 				{tag.value}
@@ -180,15 +162,6 @@
 		flex-wrap: wrap;
 		gap: 0.5rem;
 		margin-top: 0.75rem;
-	}
-
-	.ingredient-filter {
-		display: flex;
-		gap: 0.25rem;
-	}
-
-	.ingredient-filter input {
-		width: 11rem;
 	}
 
 	.chips {
