@@ -22,6 +22,10 @@ describe('formatAmount', () => {
 		[ingredient(5, null, 'stems choy sum', 6), '5-6'],
 		// Report #2: stored as 1 piece of "5cm piece fresh ginger".
 		[ingredient(1, 'piece', '5cm piece fresh ginger'), '1 ×'],
+		// An invented traybake stored these; the name already says clove and sprig.
+		[ingredient(4, 'clove', 'garlic cloves'), '4'],
+		[ingredient(4, 'sprig', 'fresh thyme sprigs'), '4'],
+		[ingredient(4, 'clove', 'garlic'), '4 cloves'],
 		[ingredient(1, null, '5cm piece fresh ginger'), '1 ×'],
 		[ingredient(null, null, 'sea salt'), '']
 	])('%o -> %s', (item, expected) => {

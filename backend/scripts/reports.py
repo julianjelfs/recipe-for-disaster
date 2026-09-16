@@ -36,7 +36,7 @@ def list_command(conn, include_resolved: bool) -> None:
         status = f"resolved {row['resolved_at']}" if row["resolved_at"] else "open"
         summary = row["comment"] or row["error"] or ""
         print(f"#{row['id']:<4} {row['kind']:<8} {row['created_at']}  {status}")
-        print(f"      {row['source_url']}")
+        print(f"      {row['source_url'] or '(created from a brief)'}")
         print(f"      {summary[:300]}")
 
 
@@ -70,6 +70,8 @@ def show_command(conn, report_id: int) -> None:
 
 def retry_command(conn, report_id: int, refetch: bool) -> None:
     row = _get(conn, report_id)
+    if not row["source_url"]:
+        sys.exit(f"#{report_id} came from a brief, not a page. Use 'Try another version' in the app.")
     if refetch or not (row["raw_extract"] or row["raw_text"]):
         page = extract(fetch_html(row["source_url"]), row["source_url"])
     else:
@@ -89,16 +91,18 @@ def resolve_command(conn, report_id: int, resolution: str) -> None:
 
 def costs_command(conn) -> None:
     spent = costs.spending(conn)
-    if spent.imports + spent.renormalises + spent.failures == 0:
+    if spent.imports + spent.creations + spent.renormalises + spent.failures == 0:
         print("No Claude calls recorded yet.")
         return
-    print("Claude spending, at list prices in USD")
+
     def count(n: int, noun: str) -> str:
         return f"{n} {noun}{'' if n == 1 else 's'}"
 
+    print("Claude spending, at list prices in USD")
     print(
         f"  total          ${spent.total_usd:.4f}"
-        f"  ({count(spent.imports, 'import')}, {count(spent.renormalises, 're-read')}, {spent.failures} failed)"
+        f"  ({count(spent.imports, 'import')}, {count(spent.creations, 'creation')},"
+        f" {count(spent.renormalises, 're-read')}, {spent.failures} failed)"
     )
     print(f"  last 30 days   ${spent.last_30_days_usd:.4f}")
     if spent.median_import_usd is not None:
@@ -109,7 +113,7 @@ def costs_command(conn) -> None:
     print("\nMost expensive:")
     for row in costs.most_expensive(conn):
         outcome = row["purpose"] if row["succeeded"] else f"{row['purpose']}, failed"
-        print(f"  ${row['cost_usd']:.4f}  {row['created_at'][:10]}  {outcome}  {row['source_url']}")
+        print(f"  ${row['cost_usd']:.4f}  {row['created_at'][:10]}  {outcome}  {row['source_url'] or '(from a brief)'}")
         print(f"             {row['calls']} call(s), {row['input_tokens']:,} tokens in, {row['output_tokens']:,} out")
 
 

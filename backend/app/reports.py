@@ -1,4 +1,4 @@
-"""Records of bad imports: recipes someone flagged, and imports that failed."""
+"""Records of bad imports: recipes someone flagged, and imports or creations that failed."""
 
 import json
 import sqlite3
@@ -8,17 +8,25 @@ from app.importer.extract import Extract
 
 
 def record_failure(
-    conn: sqlite3.Connection, *, source_url: str, error: Exception, extract: Extract | None, model: str
+    conn: sqlite3.Connection,
+    *,
+    source_url: str | None,
+    error: Exception,
+    extract: Extract | None,
+    model: str,
+    comment: str = "",
 ) -> int:
+    """Store a failure worth reviewing. A creation has no URL and no page data, so it carries its brief."""
     raw_extract = json.dumps(extract.structured, ensure_ascii=False) if extract and extract.structured is not None else None
     with conn:
         return conn.execute(
             """
-            INSERT INTO import_reports (kind, source_url, error, raw_extract, raw_text, model, parse_version)
-            VALUES ('failed', ?, ?, ?, ?, ?, ?)
+            INSERT INTO import_reports (kind, source_url, comment, error, raw_extract, raw_text, model, parse_version)
+            VALUES ('failed', ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 source_url,
+                comment,
                 f"{type(error).__name__}: {error}",
                 raw_extract,
                 extract.text if extract else None,

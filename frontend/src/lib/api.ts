@@ -7,6 +7,9 @@ export const UNITS = [
 export const COURSES = ['breakfast', 'starter', 'main', 'side', 'dessert', 'baking', 'snack', 'drink', 'sauce'] as const;
 export const DIETS = ['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'nut-free'] as const;
 
+/** Imported from a URL, or invented by Claude from a brief. */
+export type Origin = 'imported' | 'created';
+
 export interface Ingredient {
 	id: number;
 	position: number;
@@ -30,8 +33,10 @@ export interface Step {
 
 export interface Recipe {
 	id: number;
-	source_url: string;
-	source_domain: string;
+	source_url: string | null;
+	source_domain: string | null;
+	origin: Origin;
+	prompt: string | null;
 	title: string;
 	image_url: string | null;
 	servings: number | null;
@@ -58,7 +63,8 @@ export interface RecipeSummary {
 	id: number;
 	title: string;
 	image_url: string | null;
-	source_domain: string;
+	source_domain: string | null;
+	origin: Origin;
 	total_minutes: number | null;
 	complexity: number;
 	cuisine: string | null;
@@ -168,6 +174,10 @@ async function request<T>(path: string, init: RequestInit = {}, fetcher: Fetch =
 
 export function importRecipe(url: string): Promise<Recipe> {
 	return request<Recipe>('/import', { method: 'POST', body: JSON.stringify({ url }) });
+}
+
+export function createRecipe(brief: string): Promise<Recipe> {
+	return request<Recipe>('/create', { method: 'POST', body: JSON.stringify({ brief }) });
 }
 
 export function searchRecipes(params: URLSearchParams, fetcher?: Fetch): Promise<RecipeSummary[]> {

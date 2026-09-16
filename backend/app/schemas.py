@@ -13,6 +13,8 @@ UK_UNITS: tuple[str, ...] = get_args(Unit)
 Course = Literal["breakfast", "starter", "main", "side", "dessert", "baking", "snack", "drink", "sauce"]
 Diet = Literal["vegetarian", "vegan", "gluten-free", "dairy-free", "nut-free"]
 SearchSort = Literal["relevance", "newest", "title", "quickest", "simplest"]
+# Imported from a URL, or invented by Claude from a brief.
+Origin = Literal["imported", "created"]
 
 
 # Models the LLM fills in. Every field is required (no defaults) so structured outputs
@@ -90,8 +92,11 @@ class Step(BaseModel):
 
 class Recipe(BaseModel):
     id: int
-    source_url: str
-    source_domain: str
+    # Imported recipes have a URL and no prompt; created ones have a prompt and no URL.
+    source_url: str | None
+    source_domain: str | None
+    origin: Origin
+    prompt: str | None
     title: str
     image_url: str | None
     servings: int | None
@@ -118,7 +123,8 @@ class RecipeSummary(BaseModel):
     id: int
     title: str
     image_url: str | None
-    source_domain: str
+    source_domain: str | None
+    origin: Origin
     total_minutes: int | None
     complexity: int
     cuisine: str | None
@@ -145,6 +151,10 @@ class Facets(BaseModel):
 
 class ImportRequest(BaseModel):
     url: str
+
+
+class CreateRequest(BaseModel):
+    brief: str
 
 
 class FlagRequest(BaseModel):

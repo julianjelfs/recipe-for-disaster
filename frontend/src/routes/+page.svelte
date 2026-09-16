@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import RecipeImage from '$lib/RecipeImage.svelte';
 	import { formatMinutes } from '$lib/format';
 
 	let { data } = $props();
@@ -149,14 +150,18 @@
 		{#each data.recipes as recipe (recipe.id)}
 			<li>
 				<a class="card" href="/r/{recipe.id}">
-					{#if recipe.image_url}
-						<img src={recipe.image_url} alt="" loading="lazy" referrerpolicy="no-referrer" />
-					{:else}
-						<div class="placeholder"></div>
-					{/if}
+					<div class="picture">
+						<RecipeImage src={recipe.image_url} course={recipe.course} title={recipe.title} />
+					</div>
 					<span class="title">{recipe.title}</span>
 					<span class="meta">
-						{[formatMinutes(recipe.total_minutes), `Complexity ${recipe.complexity}/5`, recipe.source_domain].filter(Boolean).join(' · ')}
+						{[
+							formatMinutes(recipe.total_minutes),
+							`Complexity ${recipe.complexity}/5`,
+							recipe.source_domain ?? (recipe.origin === 'created' ? 'Created' : null)
+						]
+							.filter(Boolean)
+							.join(' · ')}
 					</span>
 				</a>
 			</li>
@@ -233,12 +238,24 @@
 		text-decoration: none;
 	}
 
-	.card img,
-	.placeholder {
+	.picture {
+		display: grid;
 		width: 100%;
 		aspect-ratio: 4 / 3;
-		object-fit: cover;
+		overflow: hidden;
 		background: var(--line);
+	}
+
+	.picture :global(img) {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	/* The course illustration sits in the middle instead of filling the tile. */
+	.picture :global(.art) {
+		width: 100%;
+		height: 100%;
 	}
 
 	.title {

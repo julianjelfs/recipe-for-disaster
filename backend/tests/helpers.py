@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
 
-from app.importer.pipeline import import_url
+from app.importer.pipeline import create_recipe, import_url
 from app.schemas import NormalisedIngredient, NormalisedRecipe, NormalisedStep, Recipe
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -89,3 +89,8 @@ def add_recipe(conn: sqlite3.Connection, url: str, **overrides) -> Recipe:
     """Import make_recipe(**overrides) as if Claude had returned it for the BBC Good Food fixture page."""
     recipe, _ = import_url(conn, url, FakeClient(make_recipe(**overrides)), fetch_fixture("bbcgoodfood.html"))
     return recipe
+
+
+def add_created_recipe(conn: sqlite3.Connection, brief: str = "something warming for four", **overrides) -> Recipe:
+    """Invent make_recipe(**overrides) as if Claude had written it from the brief."""
+    return create_recipe(conn, brief, FakeClient(make_recipe(**overrides)))

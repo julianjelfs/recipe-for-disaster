@@ -13,9 +13,10 @@ from app import config, db, reports, search, store
 from app.importer.extract import ExtractError
 from app.importer.fetch import FetchError, InvalidUrl, fetch_html
 from app.importer.normalise import NormaliseError
-from app.importer.pipeline import import_url, renormalise_recipe
+from app.importer.pipeline import create_recipe, import_url, renormalise_recipe
 from app.importer.validate import ValidationFailed, validate
 from app.schemas import (
+    CreateRequest,
     Facets,
     FlagCreated,
     FlagRequest,
@@ -26,6 +27,9 @@ from app.schemas import (
     SearchSort,
 )
 from app.ui import UiFiles
+
+# Long enough for a detailed brief, short enough that nobody pastes an essay into a Claude call.
+MAX_BRIEF = 500
 
 
 @asynccontextmanager
@@ -106,6 +110,22 @@ def import_recipe(
         recipe, created = import_url(conn, body.url, client, fetch)
     response.status_code = 201 if created else 200
     return recipe
+
+
+@app.post("/api/create", status_code=201, response_model=Recipe)
+def create_from_brief(
+    body: CreateRequest,
+    conn: sqlite3.Connection = Depends(get_conn),
+    client: anthropic.Anthropic = Depends(get_client),
+) -> Recipe:
+    """Invent a recipe from a brief. Two identical briefs make two recipes; there is nothing to dedupe."""
+    brief = body.brief.strip()
+    if not brief:
+        raise api_error(422, "Say what you fancy and Claude will invent a recipe for it.")
+    if len(brief) > MAX_BRIEF:
+        raise api_error(422, f"That brief is {len(brief)} characters. Keep it under {MAX_BRIEF}.")
+    with importer_errors():
+        return create_recipe(conn, brief, client)
 
 
 @app.get("/api/recipes", response_model=list[RecipeSummary])

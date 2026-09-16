@@ -16,6 +16,7 @@
 		</a>
 		<nav>
 			<a href="/add">Add recipe</a>
+			<a href="/create">Create recipe</a>
 		</nav>
 	</header>
 {/if}

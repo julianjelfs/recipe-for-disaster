@@ -32,32 +32,41 @@ def find_recipe_id(conn: sqlite3.Connection, source_url: str) -> int | None:
 
 
 def get_raw(conn: sqlite3.Connection, recipe_id: int) -> sqlite3.Row | None:
-    return conn.execute("SELECT source_url, raw_extract, raw_text FROM recipes WHERE id = ?", (recipe_id,)).fetchone()
+    """What a re-read needs: the saved page data for an import, or the brief for a creation."""
+    return conn.execute(
+        "SELECT source_url, origin, prompt, raw_extract, raw_text FROM recipes WHERE id = ?",
+        (recipe_id,),
+    ).fetchone()
 
 
 def insert_recipe(
     conn: sqlite3.Connection,
     *,
-    source_url: str,
+    source_url: str | None,
     recipe: NormalisedRecipe,
-    extract: Extract,
+    extract: Extract | None,
     model: str,
     parse_version: int,
+    origin: str = "imported",
+    prompt: str | None = None,
 ) -> int:
+    """Store a recipe. Imported ones have a source_url and an extract; created ones have a prompt."""
     with conn:
         cursor = conn.execute(
             """
             INSERT INTO recipes (
-                source_url, source_domain, title, image_url, servings,
+                source_url, source_domain, origin, prompt, title, image_url, servings,
                 prep_minutes, cook_minutes, total_minutes, complexity, cuisine, course,
                 raw_extract, raw_text, model, parse_version
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 source_url,
-                urlsplit(source_url).netloc.removeprefix("www."),
+                urlsplit(source_url).netloc.removeprefix("www.") if source_url else None,
+                origin,
+                prompt,
                 recipe.title,
-                extract.image_url,
+                extract.image_url if extract else None,
                 recipe.servings,
                 recipe.prep_minutes,
                 recipe.cook_minutes,
@@ -65,8 +74,8 @@ def insert_recipe(
                 recipe.complexity,
                 recipe.cuisine,
                 recipe.course,
-                json.dumps(extract.structured, ensure_ascii=False) if extract.structured is not None else None,
-                extract.text,
+                json.dumps(extract.structured, ensure_ascii=False) if extract and extract.structured is not None else None,
+                extract.text if extract else None,
                 model,
                 parse_version,
             ),

@@ -90,7 +90,7 @@ def search_recipes(
 
     rows = conn.execute(
         f"""
-        SELECT r.id, r.title, r.image_url, r.source_domain, r.total_minutes, r.complexity,
+        SELECT r.id, r.title, r.image_url, r.source_domain, r.origin, r.total_minutes, r.complexity,
                r.cuisine, r.course, r.created_at
         FROM recipes r {" ".join(joins)}
         {"WHERE " + " AND ".join(where) if where else ""}

@@ -15,3 +15,4 @@ backend/app/static/
 frontend/node_modules/
 frontend/.svelte-kit/
 frontend/build/
+*.db.backup-*

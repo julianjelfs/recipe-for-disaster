@@ -2,6 +2,7 @@
 	import { goto, invalidateAll, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
+	import RecipeImage from '$lib/RecipeImage.svelte';
 	import ServingsControl from '$lib/ServingsControl.svelte';
 	import ShoppingList from '$lib/ShoppingList.svelte';
 	import { deleteRecipe, flagRecipe, renormaliseRecipe, toApiError, type ApiError, type Ingredient } from '$lib/api';
@@ -10,6 +11,7 @@
 
 	let { data } = $props();
 	const recipe = $derived(data.recipe);
+	const created = $derived(recipe.origin === 'created');
 
 	let scale = $state(untrack(() => parseScale(page.url.searchParams.get('scale'))));
 	const cookHref = $derived(`/r/${recipe.id}/cook${scale === 1 ? '' : `?scale=${scale}`}`);
@@ -37,6 +39,7 @@
 	const groups = $derived(groupIngredients(recipe.ingredients.map((ingredient) => scaleAmount(ingredient, scale))));
 	const facts = $derived(
 		[
+			created && 'Invented by Claude',
 			recipe.prep_minutes !== null && `Prep ${formatMinutes(recipe.prep_minutes)}`,
 			recipe.cook_minutes !== null && `Cook ${formatMinutes(recipe.cook_minutes)}`,
 			recipe.total_minutes !== null && `Total ${formatMinutes(recipe.total_minutes)}`,
@@ -105,13 +108,13 @@
 
 <article>
 	<header>
-		{#if recipe.image_url}
-			<img src={recipe.image_url} alt="" referrerpolicy="no-referrer" />
-		{/if}
+		<div class="picture">
+			<RecipeImage src={recipe.image_url} course={recipe.course} title={recipe.title} eager />
+		</div>
 		<h1>{recipe.title}</h1>
 		<ul class="facts">
 			{#each facts as fact, index (index)}
-				<li>{fact}</li>
+				<li class:invented={fact === 'Invented by Claude'}>{fact}</li>
 			{/each}
 		</ul>
 
@@ -123,9 +126,15 @@
 				class="secondary"
 				onclick={renormalise}
 				disabled={busy !== null}
-				title="Replaces the ingredients and steps with a fresh read of the saved page. Notes and tags stay."
+				title={created
+					? 'Invents a new recipe from the same brief. Your notes and tags stay.'
+					: 'Replaces the ingredients and steps with a fresh read of the saved page. Notes and tags stay.'}
 			>
-				{busy === 'renormalise' ? 'Re-reading…' : 'Re-read with Claude'}
+				{#if busy === 'renormalise'}
+					{created ? 'Inventing…' : 'Re-reading…'}
+				{:else}
+					{created ? 'Try another version' : 'Re-read with Claude'}
+				{/if}
 			</button>
 			{#if confirmingDelete}
 				<button class="danger" onclick={remove} disabled={busy !== null}>
@@ -138,7 +147,11 @@
 		</div>
 
 		{#if busy === 'renormalise'}
-			<p class="hint">Claude is reading the saved page again. This can take up to a minute.</p>
+			<p class="hint">
+				{created
+					? 'Claude is writing another version from your brief. This can take up to a minute.'
+					: 'Claude is reading the saved page again. This can take up to a minute.'}
+			</p>
 		{/if}
 
 		{#if actionError}
@@ -203,10 +216,16 @@
 	{/if}
 
 	<footer>
-		<p>From <a href={recipe.source_url} target="_blank" rel="noreferrer">{recipe.source_domain}</a></p>
+		{#if created}
+			<p>Invented by Claude from: <q>{recipe.prompt}</q></p>
+		{:else}
+			<p>From <a href={recipe.source_url} target="_blank" rel="noreferrer">{recipe.source_domain}</a></p>
+		{/if}
 
 		{#if flag.kind === 'closed'}
-			<button class="link" onclick={() => (flag = { kind: 'open' })}>Flag a problem with this import</button>
+			<button class="link" onclick={() => (flag = { kind: 'open' })}>
+				Flag a problem with this recipe
+			</button>
 		{:else if flag.kind === 'sent'}
 			<p>Thanks. Saved as report #{flag.reportId}.</p>
 		{:else}
@@ -233,11 +252,30 @@
 </article>
 
 <style>
-	header img {
+	.picture {
+		display: grid;
+		width: 100%;
+		max-height: 20rem;
+		overflow: hidden;
+		border-radius: 0.75rem;
+	}
+
+	.picture :global(img) {
 		width: 100%;
 		max-height: 20rem;
 		object-fit: cover;
+	}
+
+	/* The illustration is a drawing, not a photo: it sits whole on a tinted panel rather than
+	   being cropped to the width of the page. */
+	.picture :global(.art) {
+		height: 8rem;
 		border-radius: 0.75rem;
+	}
+
+	.picture :global(.art img) {
+		width: auto;
+		height: 5.5rem;
 	}
 
 	.facts,
@@ -256,6 +294,11 @@
 		border-radius: 999px;
 		color: var(--muted);
 		font-size: 0.9rem;
+	}
+
+	.facts li.invented {
+		border-color: var(--accent);
+		color: var(--accent);
 	}
 
 	.actions {

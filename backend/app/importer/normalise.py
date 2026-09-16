@@ -12,9 +12,10 @@ from app.schemas import NormalisedRecipe
 
 MAX_ATTEMPTS = 2
 
-SYSTEM_PROMPT = """\
-You turn scraped recipe data into a clean, concise recipe for a UK home cook.
-
+# Everything a recipe must look like once Claude is done with it. Shared with app/importer/create.py,
+# which invents recipes rather than reading them: the rules are the same either way, and keeping one
+# copy is what stops the two paths drifting apart.
+RULES = """\
 # Ingredients
 - One entry per ingredient, in the original order. Put section headings in `group` \
 (e.g. "For the buttercream"). Drop "Note 3" references, substitution asides and chat.
@@ -67,7 +68,7 @@ skewer (toothpick, when testing a bake), oil or butter (nonstick spray).
 like "until golden". Drop tips, stories, video references, links, "Note" references, storage advice, \
 and quantities that just repeat the ingredient list.
 - Each step covers one stage of work. Split long steps, merge trivial ones.
-- Give one method. Drop alternative methods (stovetop, slow cooker, air fryer, bread machine versions) \
+- Give one method. Drop alternative methods (slow cooker, air fryer, stovetop versions, bread machine) \
 unless the page offers nothing else.
 - Oven temperatures in Celsius with fan and gas, e.g. "Heat the oven to 180C (160C fan, gas 4)".
 - Never write cups, ounces, pounds or Fahrenheit in a step. Convert them like ingredients, \
@@ -91,6 +92,13 @@ Null for hands-on work such as creaming, kneading, whisking or stir-frying.
 - `equipment`: notable items beyond basic pans, bowls and knives ("stand mixer", "8in sandwich tins", "wok").
 - `techniques`: short lower-case labels ("stir-frying", "creaming", "braising").
 """
+
+_IMPORT_INTRO = """\
+You turn scraped recipe data into a clean, concise recipe for a UK home cook.
+
+"""
+
+SYSTEM_PROMPT = _IMPORT_INTRO + RULES
 
 
 class NormaliseError(Exception):
@@ -121,24 +129,26 @@ class NormaliseResult:
     usage: Usage
 
 
-def normalise(
-    extract: Extract,
+def ask(
+    system: str,
+    user_content: str,
     client: anthropic.Anthropic,
     model: str = config.MODEL,
     usage: Usage | None = None,
 ) -> NormaliseResult:
     """Ask Claude for a NormalisedRecipe. On validation failure, retry once with the errors.
 
-    Each call's tokens are added to `usage` straight away, so a caller that passes one in
-    still has the counts when this raises.
+    Shared by importing and creating, so both get the same retry, the same checks and the same
+    accounting. Each call's tokens are added to `usage` straight away, so a caller that passes one
+    in still has the counts when this raises.
     """
     usage = usage if usage is not None else Usage()
-    messages: list[dict] = [{"role": "user", "content": _user_content(extract)}]
+    messages: list[dict] = [{"role": "user", "content": user_content}]
     for attempt in range(1, MAX_ATTEMPTS + 1):
         response = client.messages.parse(
             model=model,
             max_tokens=16000,
-            system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+            system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             messages=messages,
             output_format=NormalisedRecipe,
         )
@@ -156,6 +166,16 @@ def normalise(
                 {"role": "user", "content": f"That recipe failed validation:\n{feedback}\nReturn the whole corrected recipe."},
             ]
     raise AssertionError("unreachable")
+
+
+def normalise(
+    extract: Extract,
+    client: anthropic.Anthropic,
+    model: str = config.MODEL,
+    usage: Usage | None = None,
+) -> NormaliseResult:
+    """Tidy one scraped page into a recipe."""
+    return ask(SYSTEM_PROMPT, _user_content(extract), client, model, usage)
 
 
 def _user_content(extract: Extract) -> str:

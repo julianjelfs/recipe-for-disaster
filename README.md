@@ -78,9 +78,13 @@ To work through a report: `show` it to see what went wrong, change the prompt or
 | 15 | No ingredient whose name gives a size in cm or mm is stored with that size as its weight or volume. | `test_validate.py::test_inv15_size_in_name_is_not_stored_as_a_weight` |
 | 16 | Any non-API path that isn't a file returns the app's index.html; paths under /api never do. | `test_ui.py::test_inv16_client_routes_get_the_app`, `test_inv16_api_paths_never_get_the_app` |
 | 17 | A link shared to the app reaches /add as ?url= or inside ?text=, and the add page finds it in either. | `frontend/src/lib/share.test.ts` "invariant 17: …" (two tests) |
-| 18 | Every import or re-read that calls Claude records its token counts and cost, whether it succeeds or fails. | `test_costs.py::test_inv18_successful_import_records_its_cost`, `test_inv18_failed_import_records_both_attempts`, `test_inv18_a_crash_before_the_retry_still_records_the_first_call`, `test_inv18_renormalise_records_its_cost` |
+| 18 | Every import, creation or re-read that calls Claude records its token counts and cost, whether it succeeds or fails. | `test_costs.py::test_inv18_successful_import_records_its_cost`, `test_inv18_failed_import_records_both_attempts`, `test_inv18_a_crash_before_the_retry_still_records_the_first_call`, `test_inv18_renormalise_records_its_cost` |
 | 19 | The shopping list includes every ingredient exactly once, and a merged line's quantity is the sum of the quantities it replaces. | `frontend/src/lib/shopping.test.ts` "invariant 19: …" (two tests) |
 | 20 | Tin, pan, dish and tray sizes in stored step text and equipment are in inches. | `test_validate.py::test_inv20_tin_sizes_are_in_inches`, `test_inv20_validate_converts_steps_and_equipment` |
+| 21 | Every stored recipe is either imported (source URL, no brief) or created (brief, no source URL). | `test_create.py::test_inv21_every_recipe_is_imported_or_created` |
+| 22 | A created recipe is stored exactly like an imported one, and "try again" reuses its brief without fetching anything. | `test_create.py::test_inv22_created_recipe_is_stored_like_an_imported_one`, `test_inv22_try_again_reinvents_from_the_saved_brief` |
+| 23 | Migrating a database that already holds recipes preserves their ingredients, steps and tags. | `test_migrations.py::test_inv23_migrating_keeps_existing_recipe_content` |
+| 24 | Every recipe without a photo gets an illustration, and every course has one. | `frontend/src/lib/course-art.test.ts` "invariant 24: …" (two tests) |
 
 ## Running it as a service
 

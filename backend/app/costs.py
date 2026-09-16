@@ -1,4 +1,4 @@
-"""What Claude costs: prices, and a record of every import and re-read that called it."""
+"""What Claude costs: prices, and a record of every import, creation and re-read that called it."""
 
 import sqlite3
 import statistics
@@ -48,13 +48,13 @@ def record(
     conn: sqlite3.Connection,
     *,
     purpose: str,
-    source_url: str,
+    source_url: str | None,
     recipe_id: int | None,
     succeeded: bool,
     model: str,
     usage: Usage,
 ) -> int | None:
-    """Store the Claude usage of one import or re-read. Does nothing if Claude was never called."""
+    """Store the Claude usage of one import, creation or re-read. Does nothing if Claude was never called."""
     if usage.calls == 0:
         return None
     with conn:
@@ -86,9 +86,10 @@ class Spending:
     total_usd: float
     last_30_days_usd: float
     imports: int
+    creations: int
     renormalises: int
     failures: int
-    # Across successful imports only; failed attempts count towards the totals above.
+    # Across successful imports only; creations, re-reads and failed attempts count towards the totals above.
     median_import_usd: float | None
     average_import_usd: float | None
     # Rows for models with no price, left out of every sum.
@@ -105,11 +106,16 @@ def spending(conn: sqlite3.Connection) -> Spending:
     import_costs = [
         row["cost_usd"] for row in rows if row["purpose"] == "import" and row["succeeded"] and row["cost_usd"] is not None
     ]
+
+    def done(purpose: str) -> int:
+        return sum(1 for row in rows if row["purpose"] == purpose and row["succeeded"])
+
     return Spending(
         total_usd=sum(row["cost_usd"] or 0 for row in rows),
         last_30_days_usd=sum(row["cost_usd"] or 0 for row in rows if row["recent"]),
-        imports=sum(1 for row in rows if row["purpose"] == "import" and row["succeeded"]),
-        renormalises=sum(1 for row in rows if row["purpose"] == "renormalise" and row["succeeded"]),
+        imports=done("import"),
+        creations=done("create"),
+        renormalises=done("renormalise"),
         failures=sum(1 for row in rows if not row["succeeded"]),
         median_import_usd=statistics.median(import_costs) if import_costs else None,
         average_import_usd=statistics.fmean(import_costs) if import_costs else None,
