@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.julian.recipe-backup-pull</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/julianjelfs/work/recipe_for_disaster/deploy/pull-backups.sh</string>
+  </array>
+  <!-- Late morning, not 03:30: the laptop is usually asleep at night, and launchd
+       runs a missed calendar job on wake, which would fire it at a random moment. -->
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>15</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/julianjelfs/Library/Logs/recipe-backup-pull.log</string>
+  <key>StandardErrorPath</key><string>/Users/julianjelfs/Library/Logs/recipe-backup-pull.log</string>
+</dict>
+</plist>

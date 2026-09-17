@@ -1,0 +1,12 @@
+# Nightly, in the small hours.
+[Unit]
+Description=Nightly recipe database backup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+# The Pi may be off at 03:30 after a power cut. Run the missed backup on the next boot.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

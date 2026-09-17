@@ -1,0 +1,11 @@
+# One nightly backup run. Driven by recipes-backup.timer, not enabled on its own.
+[Unit]
+Description=Back up the recipe database
+Documentation=https://github.com/julianjelfs/recipe-for-disaster
+
+[Service]
+Type=oneshot
+User=julian_jelfs
+ExecStart=/home/julian_jelfs/recipe-for-disaster/deploy/backup.sh
+StandardOutput=journal
+StandardError=journal
