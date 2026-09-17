@@ -25,9 +25,7 @@ recipes.julianjelfs.co.uk {
 	reverse_proxy 127.0.0.1:8010
 }
 
-# Triad Trainer still runs on the laptop. When it moves here, uncomment this block;
-# the DNS record can exist in the meantime and simply answer for nothing.
-# triads.julianjelfs.co.uk {
-#	import house
-#	reverse_proxy 127.0.0.1:8000
-# }
+triads.julianjelfs.co.uk {
+	import house
+	reverse_proxy 127.0.0.1:8000
+}
