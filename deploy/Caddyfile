@@ -1,0 +1,33 @@
+# Caddy on the Pi: the only process listening on the network.
+#
+# Each app is named explicitly rather than covered by a wildcard, so the certificates on
+# this box are scoped to exactly these hostnames and nothing else on the domain.
+#
+# Certificates come over DNS-01, because nothing here is reachable from the internet and
+# the usual HTTP challenge needs a public address on port 80. Caddy renews them itself.
+# The token lives in /etc/caddy/cloudflare.env, root-readable only, scoped to Zone -> DNS
+# -> Edit on this one zone.
+#
+# Both A records point at the Pi's private address (192.168.68.69) and must be "DNS only"
+# in Cloudflare. A proxied record cannot point at a private address.
+
+(house) {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+		# Ask public resolvers for the challenge record rather than whatever the Pi's
+		# DHCP handed it, which may be the router answering for the local zone.
+		resolvers 1.1.1.1 8.8.8.8
+	}
+}
+
+recipes.julianjelfs.co.uk {
+	import house
+	reverse_proxy 127.0.0.1:8010
+}
+
+# Triad Trainer still runs on the laptop. When it moves here, uncomment this block;
+# the DNS record can exist in the meantime and simply answer for nothing.
+# triads.julianjelfs.co.uk {
+#	import house
+#	reverse_proxy 127.0.0.1:8000
+# }
