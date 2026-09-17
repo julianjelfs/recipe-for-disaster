@@ -88,18 +88,24 @@ Haiku call, which takes the same time from anywhere.
 
 ## Outstanding
 
-- **Triad Trainer still runs on the laptop.** The DNS record `triads.julianjelfs.co.uk`
-  exists and points at the Pi, and the Caddyfile has its block ready and commented out.
-- **Confirm the house name resolves on the wifi.** At the time of writing the Deco and
-  Virgin's resolver were still inside the 1800s negative cache. If the name stays dead once
-  that has passed, Virgin's resolver is stripping private answers: point the Deco's upstream
-  DNS at 1.1.1.1, or run AdGuard Home on the Pi and hand it out as the network's DNS.
-- **Install the PWA on phones from the house address**, not the tailnet one. A PWA is
-  installed per origin.
+- **Delete the Route 53 hosted zone**, but not yet. Resolvers cache the parent delegation
+  for 48 hours, and while they still believe AWS is authoritative, removing the zone turns
+  NXDOMAIN into SERVFAIL. Give it a few days, then delete it to stop the charge.
 - **A USB SSD, £25-30**, if the SD card ever proves the weak point. Both Pi 4 and 5 boot
   from USB. Backups make a card failure an hour's annoyance rather than a loss.
-- **Delete the Route 53 hosted zone** once Cloudflare has been answering for a while, to
-  stop the charge.
 - **The Anthropic key sits on a machine everyone on the wifi can reach**, and the import
   button spends money. Among people you know that's fine. If it ever matters: a guest wifi
   network that can't see the Pi, or a spending cap on the key.
+
+## Done after the first write-up
+
+- **Triad Trainer moved to the Pi** the same evening, following the same pattern: its own
+  systemd unit on 8000, its own certificate, its own nightly backup at 03:50, and
+  `scripts/triad-trainer` rewritten to drive the Pi. The laptop now serves nothing.
+- **The house names resolve.** The Deco's upstream DNS was set manually to 1.1.1.1 and
+  1.0.0.1. Virgin's resolver was holding the old AWS nameservers with 47 hours left on the
+  delegation TTL, which looked exactly like rebinding protection and was not. Rebinding was
+  ruled out with `dig 192-168-68-69.nip.io`, which both the Deco and Virgin answered
+  correctly.
+- **The pattern is written up as a skill**, `ship-a-home-app`, so the next app follows it
+  without rediscovering any of this.
