@@ -13,12 +13,10 @@ ROOT="$(cd "$(dirname "$(readlink "${BASH_SOURCE[0]}" || echo "${BASH_SOURCE[0]}
 on_pi() { ssh -o BatchMode=yes -o ConnectTimeout=10 "$PI" "$@"; }
 
 # The house name only answers on the home wifi. Away from it, fall back to the tailnet.
+at_home() { [ -n "$(dig +short A recipes.julianjelfs.co.uk 2>/dev/null)" ]; }
+
 url() {
-	if [ -n "$(dig +short A recipes.julianjelfs.co.uk 2>/dev/null)" ]; then
-		echo "$HOUSE_URL"
-	else
-		echo "$TAILNET_URL"
-	fi
+	if at_home; then echo "$HOUSE_URL"; else echo "$TAILNET_URL"; fi
 }
 
 case "${1:-open}" in
@@ -37,13 +35,23 @@ case "${1:-open}" in
 			fi
 			printf "recipes   : %s\n" "$(curl -sf -m 5 http://127.0.0.1:8010/api/recipes | python3 -c "import sys,json; d=json.load(sys.stdin); r=d.get(\"recipes\",d) if isinstance(d,dict) else d; print(len(r))" 2>/dev/null || echo "?")"
 			printf "certificate: expires %s\n" "$(echo | openssl s_client -connect 127.0.0.1:443 -servername recipes.julianjelfs.co.uk 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)"
-			printf "backups   : %s, newest %s\n" "$(ls -1 ~/recipe-backups/recipes-*.db 2>/dev/null | wc -l | tr -d " ")" "$(ls -1t ~/recipe-backups/recipes-*.db 2>/dev/null | head -1 | xargs -r basename)"
+			n=$(ls -1 ~/recipe-backups/recipes-*.db 2>/dev/null | wc -l | tr -d " ")
+			if [ "$n" = 0 ]; then
+				printf "backups   : none yet\n"
+			else
+				printf "backups   : %s, newest %s\n" "$n" "$(ls -1t ~/recipe-backups/recipes-*.db 2>/dev/null | head -1 | xargs -r basename)"
+			fi
 			printf "next backup: %s\n" "$(systemctl list-timers recipes-backup --no-pager 2>/dev/null | awk "NR==2 {print \$1, \$2, \$3}")"
 			printf "disk      : %s used of %s\n" "$(df -h / | awk "NR==2{print \$3}")" "$(df -h / | awk "NR==2{print \$2}")"
 			printf "cpu temp  : %.1fC\n" "$(awk "{print \$1/1000}" /sys/class/thermal/thermal_zone0/temp)"
 			printf "uptime    : %s\n" "$(uptime -p)"
 		'
-		echo "url       : $(url)"
+		if at_home; then
+			echo "house     : $HOUSE_URL"
+		else
+			echo "house     : $HOUSE_URL (not resolving from here)"
+		fi
+		echo "tailnet   : $TAILNET_URL"
 		;;
 
 	logs)   on_pi "sudo journalctl -u recipes -n ${2:-40} -f" ;;
