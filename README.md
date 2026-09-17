@@ -86,33 +86,53 @@ To work through a report: `show` it to see what went wrong, change the prompt or
 | 23 | Migrating a database that already holds recipes preserves their ingredients, steps and tags. | `test_migrations.py::test_inv23_migrating_keeps_existing_recipe_content` |
 | 24 | Every recipe without a photo gets an illustration, and every course has one. | `frontend/src/lib/course-art.test.ts` "invariant 24: …" (two tests) |
 
-## Running it as a service
+## Where it runs
 
-```sh
-./scripts/install-service.sh
-```
+The app lives on a Raspberry Pi 4 on the house wifi, not on a laptop. One systemd unit
+runs uvicorn on loopback, and Caddy in front of it holds a Let's Encrypt certificate for
+`recipes.julianjelfs.co.uk`. Anyone on the wifi can open it with nothing installed.
 
-That builds the frontend, has the API serve it so the whole app is one process on port 8010, installs a launchd agent that starts it at login and restarts it if it dies, and puts a `recipes` command on your PATH. It works the same way as Triad Trainer.
+Drive it from the laptop with `recipes`, which does everything over SSH:
 
 ```sh
 recipes            # open it
-recipes status     # running? reachable where?
+recipes status     # app, Caddy, certificate, backups, disk, temperature
 recipes rebuild    # after changing code
 recipes logs
+recipes backup     # snapshot now and pull it here
 ```
 
-`recipes serve` publishes it to your tailnet over HTTPS at `https://<this-machine>.<tailnet>.ts.net:8445`. Triad Trainer has 8443. The API stays bound to loopback and Tailscale does the proxying, so nothing is exposed to the public internet. Cooking mode needs HTTPS to keep a phone's screen on.
+`recipes rebuild` pulls the code on the Pi, syncs backend dependencies there, builds the
+frontend **here** and copies the result across, then restarts. The Pi never runs Vite or
+sharp, which is what keeps a 2GB board comfortable.
 
-`recipes serve` and `recipes unserve` only touch this app's rule on 8445, and `triad-trainer` only touches its own on 8443, so either can be re-published without affecting the other.
+The certificate comes over a DNS-01 challenge, so nothing is exposed to the internet and
+no port is open on the router. Caddy renews it every 60 days on its own. Away from the
+house the app is still on the tailnet at `https://pi.tail50bfbf.ts.net:8445`, and
+`recipes url` picks whichever of the two applies.
+
+To set a Pi up from scratch, or to put the units and Caddyfile back after changing them,
+run `./deploy/install-pi.sh` on the Pi. It is safe to re-run and never touches the
+database or the Cloudflare token. `docs/home-server.md` has the whole build.
+
+The database is backed up nightly on the Pi, keeping 14, and pulled to
+`~/Backups/recipe-for-disaster` on the laptop, keeping 30.
 
 ## Installing on a phone
 
-The app is a PWA. With Tailscale connected on the phone, open `https://<this-machine>.<tailnet>.ts.net:8445`, then:
+The app is a PWA. On the house wifi, open `https://recipes.julianjelfs.co.uk`, then:
 
-- **Android (Chrome):** menu, then "Install app" or "Add to home screen". Once installed, Recipes appears in the share sheet, so sharing a recipe page from the browser imports it.
-- **iPhone (Safari):** Share, then "Add to Home Screen". iOS doesn't let web apps receive shares. A Shortcut that opens `…:8445/add?url=` followed by the shared link does the same job.
+- **Android (Chrome):** menu, then "Install app" or "Add to home screen". Once installed,
+  Recipes appears in the share sheet, so sharing a recipe page from the browser imports it.
+- **iPhone (Safari):** Share, then "Add to Home Screen". iOS doesn't let web apps receive
+  shares. A Shortcut that opens `https://recipes.julianjelfs.co.uk/add?url=` followed by
+  the shared link does the same job.
 
-The icons come from one drawing in `frontend/scripts/icons.mjs`. After changing it, run `node scripts/icons.mjs` in `frontend/` and commit what it writes to `static/`.
+Install from the house address rather than the tailnet one. A PWA is installed per origin,
+so installing both gives you two separate apps with two separate caches.
+
+The icons come from one drawing in `frontend/scripts/icons.mjs`. After changing it, run
+`node scripts/icons.mjs` in `frontend/` and commit what it writes to `static/`.
 
 ## Known limits
 
