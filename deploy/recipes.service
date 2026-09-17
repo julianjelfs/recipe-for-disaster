@@ -1,0 +1,30 @@
+# Recipe for Disaster, as a systemd service on the Pi.
+#
+# The app binds to loopback only. Caddy is the one process listening on the network.
+# Install with deploy/install-pi.sh; don't edit the copy in /etc.
+
+[Unit]
+Description=Recipe for Disaster
+Documentation=https://github.com/julianjelfs/recipe-for-disaster
+# The API opens its database at startup, so wait for a real network, not just an interface.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=julian_jelfs
+WorkingDirectory=/home/julian_jelfs/recipe-for-disaster/backend
+# python-dotenv reads backend/.env itself; this is here so `systemctl show` reports the same
+# variables, and is optional so a missing file doesn't block startup.
+EnvironmentFile=-/home/julian_jelfs/recipe-for-disaster/backend/.env
+# Straight at the venv, not `uv run`: uv re-resolves the environment on every start, which
+# cost 12s of a Pi 4's CPU before uvicorn got a look in. Deploys run `uv sync` instead.
+ExecStart=/home/julian_jelfs/recipe-for-disaster/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8010
+Restart=always
+RestartSec=2
+# SD cards die of writes. Journal only, no separate log file to rotate.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
