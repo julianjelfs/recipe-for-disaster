@@ -221,13 +221,11 @@
 					</div>
 					<span class="title">{recipe.title}</span>
 					<span class="meta">
-						{[
-							formatMinutes(recipe.total_minutes),
-							`Complexity ${recipe.complexity}/5`,
-							recipe.source_domain ?? (recipe.origin === 'created' ? 'Created' : null)
-						]
-							.filter(Boolean)
-							.join(' · ')}
+						{#if recipe.total_minutes !== null}<span>{formatMinutes(recipe.total_minutes)} ·</span>{/if}
+						<span>Complexity {recipe.complexity}/5</span>
+						{#if recipe.source_domain ?? recipe.origin === 'created'}
+							<span class="source">· {recipe.source_domain ?? 'Created'}</span>
+						{/if}
 					</span>
 				</a>
 			</li>
@@ -410,5 +408,33 @@
 		padding: 0.25rem 0.75rem 0.75rem;
 		color: var(--muted);
 		font-size: 0.85rem;
+	}
+
+	/* Each part wraps whole, so "Complexity 2/5" never splits across lines. */
+	.meta span {
+		white-space: nowrap;
+	}
+
+	/* Phones get two narrower cards per row instead of one card whose picture fills the screen. */
+	@media (max-width: 32rem) {
+		.grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 0.6rem;
+		}
+
+		.title {
+			padding: 0.5rem 0.6rem 0;
+			font-size: 0.95rem;
+			line-height: 1.3;
+		}
+
+		.meta {
+			padding: 0.2rem 0.6rem 0.6rem;
+			font-size: 0.8rem;
+		}
+
+		.source {
+			display: none;
+		}
 	}
 </style>
