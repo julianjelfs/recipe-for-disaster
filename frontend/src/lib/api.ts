@@ -73,6 +73,12 @@ export interface RecipeSummary {
 	created_at: string;
 }
 
+export interface RecipePage {
+	recipes: RecipeSummary[];
+	/** Every recipe that matches, not just the ones on this page. */
+	total: number;
+}
+
 export interface FacetValue {
 	value: string;
 	count: number;
@@ -180,9 +186,18 @@ export function createRecipe(brief: string): Promise<Recipe> {
 	return request<Recipe>('/create', { method: 'POST', body: JSON.stringify({ brief }) });
 }
 
-export function searchRecipes(params: URLSearchParams, fetcher?: Fetch): Promise<RecipeSummary[]> {
-	const query = params.toString();
-	return request<RecipeSummary[]>(`/recipes${query ? `?${query}` : ''}`, {}, fetcher);
+/** How many recipes the home page asks for at a time. The API allows up to 100. */
+export const PAGE_SIZE = 48;
+
+export function searchRecipes(
+	params: URLSearchParams,
+	{ offset = 0, limit = PAGE_SIZE } = {},
+	fetcher?: Fetch
+): Promise<RecipePage> {
+	const query = new URLSearchParams(params);
+	query.set('offset', String(offset));
+	query.set('limit', String(limit));
+	return request<RecipePage>(`/recipes?${query}`, {}, fetcher);
 }
 
 export function getFacets(fetcher?: Fetch): Promise<Facets> {

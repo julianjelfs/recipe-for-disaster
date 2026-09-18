@@ -76,8 +76,8 @@ def test_created_recipes_are_searchable_and_deletable(conn):
     created = create_recipe(conn, BRIEF, FakeClient(make_recipe(title="Squash stew")))
     from app import search
 
-    assert [r.id for r in search.search_recipes(conn, q="squash")] == [created.id]
-    assert [r.origin for r in search.search_recipes(conn)] == ["created"]
+    assert [r.id for r in search.search_recipes(conn, q="squash").recipes] == [created.id]
+    assert [r.origin for r in search.search_recipes(conn).recipes] == ["created"]
     assert store.delete_recipe(conn, created.id)
     assert conn.execute("SELECT count(*) FROM recipe_search").fetchone()[0] == 0
 

@@ -133,6 +133,13 @@ class RecipeSummary(BaseModel):
     created_at: str
 
 
+class RecipePage(BaseModel):
+    """One page of search results, and how many recipes match in all."""
+
+    recipes: list[RecipeSummary]
+    total: int
+
+
 class FacetValue(BaseModel):
     value: str
     count: int

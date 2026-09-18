@@ -4,7 +4,7 @@ import re
 import sqlite3
 from collections.abc import Iterable
 
-from app.schemas import Facets, FacetValue, RecipeSummary, SearchSort
+from app.schemas import Facets, FacetValue, RecipePage, RecipeSummary, SearchSort
 
 # An ingredient whose canonical name contains the phrase as whole words ("chicken" in "chicken thigh").
 # The phrase is passed twice: as typed, and with each word made singular.
@@ -18,13 +18,14 @@ _HAS_INGREDIENT = """
 """
 
 # bm25 weights, in recipe_search column order: recipe_id, title, ingredients, steps, tags, notes, meta.
-_RELEVANCE = "bm25(recipe_search, 0, 10, 5, 1, 3, 2, 3)"
+# Every order ends on r.id so ties fall the same way each time and pages never overlap.
+_RELEVANCE = "bm25(recipe_search, 0, 10, 5, 1, 3, 2, 3), r.id"
 
 _ORDER_BY = {
     "newest": "r.created_at DESC, r.id DESC",
     "title": "r.title COLLATE NOCASE, r.id",
-    "quickest": "r.total_minutes IS NULL, r.total_minutes, r.title COLLATE NOCASE",
-    "simplest": "r.complexity, r.total_minutes IS NULL, r.total_minutes, r.title COLLATE NOCASE",
+    "quickest": "r.total_minutes IS NULL, r.total_minutes, r.title COLLATE NOCASE, r.id",
+    "simplest": "r.complexity, r.total_minutes IS NULL, r.total_minutes, r.title COLLATE NOCASE, r.id",
 }
 
 
@@ -51,7 +52,8 @@ def search_recipes(
     tags: Iterable[str] = (),
     sort: SearchSort | None = None,
     limit: int = 500,
-) -> list[RecipeSummary]:
+    offset: int = 0,
+) -> RecipePage:
     joins: list[str] = []
     where: list[str] = []
     params: list[object] = []
@@ -88,16 +90,17 @@ def search_recipes(
     sort = sort or ("relevance" if match else "newest")
     order = _RELEVANCE if sort == "relevance" and match else _ORDER_BY.get(sort, _ORDER_BY["newest"])
 
+    source = f"""FROM recipes r {" ".join(joins)} {"WHERE " + " AND ".join(where) if where else ""}"""
+    total = conn.execute(f"SELECT count(*) {source}", params).fetchone()[0]
     rows = conn.execute(
         f"""
         SELECT r.id, r.title, r.image_url, r.source_domain, r.origin, r.total_minutes, r.complexity,
                r.cuisine, r.course, r.created_at
-        FROM recipes r {" ".join(joins)}
-        {"WHERE " + " AND ".join(where) if where else ""}
+        {source}
         ORDER BY {order}
-        LIMIT ?
+        LIMIT ? OFFSET ?
         """,
-        [*params, limit],
+        [*params, limit, offset],
     ).fetchall()
 
     diet: dict[int, list[str]] = {}
@@ -110,7 +113,10 @@ def search_recipes(
         ):
             diet.setdefault(tag["recipe_id"], []).append(tag["value"])
 
-    return [RecipeSummary.model_validate({**dict(row), "diet": diet.get(row["id"], [])}) for row in rows]
+    return RecipePage(
+        recipes=[RecipeSummary.model_validate({**dict(row), "diet": diet.get(row["id"], [])}) for row in rows],
+        total=total,
+    )
 
 
 def facets(conn: sqlite3.Connection) -> Facets:

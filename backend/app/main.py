@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager, contextmanager
 from functools import lru_cache
 
 import anthropic
-from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 
 from app import config, db, reports, search, store
 from app.importer.extract import ExtractError
@@ -23,13 +23,16 @@ from app.schemas import (
     ImportRequest,
     Recipe,
     RecipeEdit,
-    RecipeSummary,
+    RecipePage,
     SearchSort,
 )
 from app.ui import UiFiles
 
 # Long enough for a detailed brief, short enough that nobody pastes an essay into a Claude call.
 MAX_BRIEF = 500
+# The home page loads recipes a page at a time as you scroll.
+PAGE_SIZE = 48
+MAX_PAGE_SIZE = 100
 
 
 @asynccontextmanager
@@ -128,7 +131,7 @@ def create_from_brief(
         return create_recipe(conn, brief, client)
 
 
-@app.get("/api/recipes", response_model=list[RecipeSummary])
+@app.get("/api/recipes", response_model=RecipePage)
 def list_recipes(
     q: str | None = None,
     has: str = "",
@@ -138,8 +141,10 @@ def list_recipes(
     course: str | None = None,
     tag: str = "",
     sort: SearchSort | None = None,
+    limit: int = Query(PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(0, ge=0),
     conn: sqlite3.Connection = Depends(get_conn),
-) -> list[RecipeSummary]:
+) -> RecipePage:
     """`has` and `tag` take comma-separated lists; a recipe must match every entry."""
     return search.search_recipes(
         conn,
@@ -151,6 +156,8 @@ def list_recipes(
         course=course,
         tags=_split(tag),
         sort=sort,
+        limit=limit,
+        offset=offset,
     )
 
 

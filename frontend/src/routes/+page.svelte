@@ -1,12 +1,35 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import IngredientFilter from '$lib/IngredientFilter.svelte';
 	import RecipeImage from '$lib/RecipeImage.svelte';
+	import { ApiError, PAGE_SIZE, searchRecipes } from '$lib/api';
 	import { activeFilterCount } from '$lib/filters';
 	import { formatMinutes } from '$lib/format';
+	import type { Snapshot } from './$types';
 
 	let { data } = $props();
+
+	// Starts over from the first page whenever the search or filters change.
+	let recipes = $derived(data.page.recipes);
+	const total = $derived(data.page.total);
+	const more = $derived(recipes.length < total);
+	let loading = $state(false);
+	let loadError = $state('');
+	let nearEnd = $state(false);
+
+	/** Going back to the list reloads as many recipes as were showing and returns to the same spot. */
+	export const snapshot: Snapshot<{ count: number; y: number }> = {
+		capture: () => ({ count: recipes.length, y: window.scrollY }),
+		restore: async ({ count, y }) => {
+			while (recipes.length < Math.min(count, total) && !loadError) {
+				await loadMore(Math.min(count - recipes.length, 100));
+			}
+			await tick();
+			window.scrollTo(0, y);
+		}
+	};
 
 	const params = $derived(page.url.searchParams);
 	const has = $derived(splitParam('has'));
@@ -46,6 +69,36 @@
 	function toggleTag(value: string) {
 		const next = tags.includes(value) ? tags.filter((tag) => tag !== value) : [...tags, value];
 		update({ tag: next.join(',') || null });
+	}
+
+	async function loadMore(limit = PAGE_SIZE) {
+		if (loading || !more) return;
+		const forPage = data.page;
+		loading = true;
+		loadError = '';
+		try {
+			const next = await searchRecipes(params, { offset: recipes.length, limit });
+			// A change of search or filter while this was in flight has already replaced the list.
+			if (data.page === forPage) recipes = [...recipes, ...next.recipes];
+		} catch (error) {
+			if (data.page === forPage) loadError = error instanceof ApiError ? error.message : 'Could not load more recipes.';
+		} finally {
+			loading = false;
+		}
+	}
+
+	// Keeps loading while the end of the list is close, but won't retry on its own after an error.
+	$effect(() => {
+		if (nearEnd && more && !loading && !loadError) loadMore();
+	});
+
+	function watchEnd(node: HTMLElement) {
+		const observer = new IntersectionObserver(([entry]) => (nearEnd = entry.isIntersecting), { rootMargin: '800px 0px' });
+		observer.observe(node);
+		return () => {
+			observer.disconnect();
+			nearEnd = false;
+		};
 	}
 
 	function clearFilters() {
@@ -138,7 +191,7 @@
 
 {#if data.facets.total === 0}
 	<p class="empty">No recipes yet. <a href="/add">Add your first one.</a></p>
-{:else if data.recipes.length === 0}
+{:else if total === 0}
 	<p class="empty">
 		Nothing matches.
 		{#if filtering}<button class="link" onclick={clearAll}>Clear the search and filters</button>{/if}
@@ -146,7 +199,7 @@
 {:else}
 	<div class="list-head">
 		<p class="count">
-			{data.recipes.length === data.facets.total ? `${data.facets.total} recipes` : `${data.recipes.length} of ${data.facets.total} recipes`}
+			{total === data.facets.total ? `${total} recipes` : `${total} of ${data.facets.total} recipes`}
 			{#if filterCount && !showFilters}
 				· <button class="link" onclick={clearFilters}>clear filters</button>
 			{/if}
@@ -160,7 +213,7 @@
 		</select>
 	</div>
 	<ul class="grid">
-		{#each data.recipes as recipe (recipe.id)}
+		{#each recipes as recipe (recipe.id)}
 			<li>
 				<a class="card" href="/r/{recipe.id}">
 					<div class="picture">
@@ -180,6 +233,14 @@
 			</li>
 		{/each}
 	</ul>
+	{#if more}
+		<div class="more" {@attach watchEnd}>
+			{#if loadError}<p class="empty">{loadError}</p>{/if}
+			<button class="secondary" onclick={() => loadMore()} disabled={loading}>
+				{loading ? 'Loading…' : loadError ? 'Try again' : 'Show more'}
+			</button>
+		</div>
+	{/if}
 {/if}
 
 <style>
@@ -298,6 +359,14 @@
 		gap: 1rem;
 		padding: 0;
 		list-style: none;
+	}
+
+	.more {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.5rem;
+		margin-block: 1.5rem;
 	}
 
 	.card {

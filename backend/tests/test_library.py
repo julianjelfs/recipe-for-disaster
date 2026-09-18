@@ -9,7 +9,7 @@ from tests.helpers import BBC_URL, FakeClient, add_recipe, ingredient, make_reci
 
 
 def ids(conn, **filters) -> list[int]:
-    return [recipe.id for recipe in search.search_recipes(conn, **filters)]
+    return [recipe.id for recipe in search.search_recipes(conn, **filters).recipes]
 
 
 def library(conn):
@@ -85,6 +85,60 @@ def test_filters_and_sorting(conn):
     assert ids(conn, sort="simplest") == [soup.id, sandwich.id, pie.id]
 
 
+def shelf(conn, count: int = 11) -> list[int]:
+    """Recipes that tie on time, complexity and title, so only the tiebreak keeps pages apart."""
+    return [
+        add_recipe(
+            conn, f"https://example.com/stew-{n}",
+            title="Stew" if n % 2 else f"Stew {n % 3}", total_minutes=30 if n % 3 else None, complexity=2,
+            ingredients=[ingredient("onion", "onion", 1, None)], steps=[step("Simmer the stew.", ["onion"])],
+        ).id
+        for n in range(count)
+    ]
+
+
+@pytest.mark.parametrize("sort", [None, "newest", "title", "quickest", "simplest", "relevance"])
+@pytest.mark.parametrize("limit", [1, 3, 4, 11, 20])
+def test_inv25_pages_together_return_every_match_once_in_order(conn, sort, limit):
+    """Invariant 25: reading the pages in turn gives every match exactly once, in the order of the whole list."""
+    shelf(conn)
+    whole = ids(conn, q="stew", sort=sort)
+    paged: list[int] = []
+    for offset in range(0, len(whole) + limit, limit):
+        paged += ids(conn, q="stew", sort=sort, limit=limit, offset=offset)
+    assert len(whole) == 11
+    assert paged == whole
+
+
+@pytest.mark.parametrize("order", [*search._ORDER_BY.values(), search._RELEVANCE])
+def test_inv25_every_order_breaks_ties_by_id(order):
+    """Invariant 25: SQLite only happens to keep ties in insert order, so each order ends on the id to guarantee it."""
+    assert order.split(",")[-1].strip() in ("r.id", "r.id DESC")
+
+
+@pytest.mark.parametrize(("limit", "offset"), [(1, 0), (3, 3), (5, 10), (5, 50)])
+def test_inv26_total_counts_every_match_whatever_the_page(conn, limit, offset):
+    """Invariant 26: total is the number of matching recipes, not the number on this page."""
+    library(conn)
+    shelf(conn)
+    assert search.search_recipes(conn, limit=limit, offset=offset).total == 14
+    assert search.search_recipes(conn, has=["leek"], limit=limit, offset=offset).total == 2
+    assert search.search_recipes(conn, q="stew", limit=limit, offset=offset).total == 11
+
+
+def test_inv27_api_pages_are_bounded(api, conn):
+    """Invariant 27: the API sends at most 100 recipes per request and a default page when none is asked for."""
+    shelf(conn, 60)
+    http = api(FakeClient())
+    first = http.get("/api/recipes").json()
+    assert (len(first["recipes"]), first["total"]) == (48, 60)
+    rest = http.get("/api/recipes", params={"offset": 48}).json()
+    assert len(rest["recipes"]) == 12
+    assert http.get("/api/recipes", params={"limit": 101}).status_code == 422
+    assert http.get("/api/recipes", params={"limit": 0}).status_code == 422
+    assert http.get("/api/recipes", params={"offset": -1}).status_code == 422
+
+
 def test_facets_count_recipes(conn):
     library(conn)
     facets = search.facets(conn)
@@ -152,10 +206,13 @@ def edit_payload(**overrides) -> dict:
 def test_api_search_and_facets(api, conn):
     library(conn)
     http = api(FakeClient())
-    assert [r["title"] for r in http.get("/api/recipes", params={"has": "leek, bacon"}).json()] == ["Leek and bacon pie"]
-    [soup] = http.get("/api/recipes", params={"q": "soup", "max_total": 60}).json()
+    leek_and_bacon = http.get("/api/recipes", params={"has": "leek, bacon"}).json()
+    assert [r["title"] for r in leek_and_bacon["recipes"]] == ["Leek and bacon pie"]
+    assert leek_and_bacon["total"] == 1
+    [soup] = http.get("/api/recipes", params={"q": "soup", "max_total": 60}).json()["recipes"]
     assert soup["diet"] == ["vegetarian"]
-    assert http.get("/api/recipes", params={"tag": "vegetarian", "sort": "title"}).json()[0]["title"] == "Leek and potato soup"
+    vegetarian = http.get("/api/recipes", params={"tag": "vegetarian", "sort": "title"}).json()
+    assert vegetarian["recipes"][0]["title"] == "Leek and potato soup"
     assert http.get("/api/facets").json()["total"] == 3
 
 

@@ -85,6 +85,9 @@ To work through a report: `show` it to see what went wrong, change the prompt or
 | 22 | A created recipe is stored exactly like an imported one, and "try again" reuses its brief without fetching anything. | `test_create.py::test_inv22_created_recipe_is_stored_like_an_imported_one`, `test_inv22_try_again_reinvents_from_the_saved_brief` |
 | 23 | Migrating a database that already holds recipes preserves their ingredients, steps and tags. | `test_migrations.py::test_inv23_migrating_keeps_existing_recipe_content` |
 | 24 | Every recipe without a photo gets an illustration, and every course has one. | `frontend/src/lib/course-art.test.ts` "invariant 24: …" (two tests) |
+| 25 | Reading the recipe list page by page returns every match exactly once, in the same order as the whole list, for every sort. | `test_library.py::test_inv25_pages_together_return_every_match_once_in_order`, `test_inv25_every_order_breaks_ties_by_id` |
+| 26 | A page's `total` is the number of recipes matching the search and filters, whatever the page size or offset. | `test_library.py::test_inv26_total_counts_every_match_whatever_the_page` |
+| 27 | The list API returns 48 recipes when no page size is given and refuses more than 100 in one request. | `test_library.py::test_inv27_api_pages_are_bounded` |
 
 ## Where it runs
 
