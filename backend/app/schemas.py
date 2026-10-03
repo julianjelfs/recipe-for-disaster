@@ -156,6 +156,13 @@ class Facets(BaseModel):
     tags: list[FacetValue]
 
 
+class OfflineCopy(BaseModel):
+    """Everything a phone needs to browse the library away from the home network."""
+
+    recipes: list[Recipe]
+    facets: Facets
+
+
 class ImportRequest(BaseModel):
     url: str
 

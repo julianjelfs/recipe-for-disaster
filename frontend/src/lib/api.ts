@@ -166,7 +166,7 @@ async function request<T>(path: string, init: RequestInit = {}, fetcher: Fetch =
 			headers: { 'Content-Type': 'application/json', ...init.headers }
 		});
 	} catch {
-		throw new ApiError(0, 'Could not reach the server.');
+		throw new ApiError(0, "Could not reach the recipe server. Adding, creating and editing need the home wifi.");
 	}
 	const body = await response.json().catch(() => null);
 	if (!response.ok) {

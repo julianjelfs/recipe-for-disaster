@@ -1,5 +1,6 @@
 """FastAPI app. JSON API under /api, and the built frontend everywhere else."""
 
+import hashlib
 import os
 import sqlite3
 from collections.abc import Callable, Iterator
@@ -7,7 +8,7 @@ from contextlib import asynccontextmanager, contextmanager
 from functools import lru_cache
 
 import anthropic
-from fastapi import Depends, FastAPI, HTTPException, Query, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 
 from app import config, db, reports, search, store
 from app.importer.extract import ExtractError
@@ -21,6 +22,7 @@ from app.schemas import (
     FlagCreated,
     FlagRequest,
     ImportRequest,
+    OfflineCopy,
     Recipe,
     RecipeEdit,
     RecipePage,
@@ -164,6 +166,38 @@ def list_recipes(
 @app.get("/api/facets", response_model=Facets)
 def read_facets(conn: sqlite3.Connection = Depends(get_conn)) -> Facets:
     return search.facets(conn)
+
+
+@app.get("/api/offline", response_model=OfflineCopy)
+def offline_copy(request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> Response:
+    """Every recipe in full, plus the facets. The service worker saves this so the app can be
+    browsed, searched and cooked from when the Pi is out of reach.
+
+    Phones check it on every visit, so it carries an ETag: an unchanged library costs a 304, not
+    the whole copy again."""
+    ids = [row[0] for row in conn.execute("SELECT id FROM recipes ORDER BY id")]
+    body = OfflineCopy(
+        recipes=[store.get_recipe(conn, recipe_id) for recipe_id in ids],
+        facets=search.facets(conn),
+    ).model_dump_json().encode()
+    etag = f'"{hashlib.sha256(body).hexdigest()[:32]}"'
+    headers = {"ETag": etag, "Cache-Control": "no-cache"}
+    if _etag_matches(request.headers.get("if-none-match", ""), etag):
+        return Response(status_code=304, headers=headers)
+    return Response(body, media_type="application/json", headers=headers)
+
+
+def _etag_matches(header: str, etag: str) -> bool:
+    """Caddy's encode marks the ETag of a compressed response ("abc" becomes "abc-zstd", or a weak
+    W/"abc"), and the phone sends that back. Compare the hash underneath."""
+
+    def bare(tag: str) -> str:
+        tag = tag.strip().removeprefix("W/").strip('"')
+        for suffix in ("-zstd", "-gzip", "-br"):
+            tag = tag.removesuffix(suffix)
+        return tag
+
+    return any(bare(tag) == bare(etag) for tag in header.split(",") if tag.strip())
 
 
 @app.get("/api/recipes/{recipe_id}", response_model=Recipe)
