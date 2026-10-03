@@ -32,6 +32,7 @@ function recipe(overrides: Overrides): Recipe {
 		parse_version: 2,
 		created_at: '2026-10-01 12:00:00',
 		updated_at: '2026-10-01 12:00:00',
+		photo_ids: [],
 		...overrides,
 		ingredients: overrides.ingredients.map(([name, canonical], position) => ({
 			id: id * 100 + position,

@@ -12,6 +12,7 @@
 	let { data } = $props();
 	const recipe = $derived(data.recipe);
 	const created = $derived(recipe.origin === 'created');
+	const photographed = $derived(recipe.origin === 'photographed');
 
 	let scale = $state(untrack(() => parseScale(page.url.searchParams.get('scale'))));
 	const cookHref = $derived(`/r/${recipe.id}/cook${scale === 1 ? '' : `?scale=${scale}`}`);
@@ -128,7 +129,9 @@
 				disabled={busy !== null}
 				title={created
 					? 'Invents a new recipe from the same brief. Your notes and tags stay.'
-					: 'Replaces the ingredients and steps with a fresh read of the saved page. Notes and tags stay.'}
+					: photographed
+						? 'Replaces the ingredients and steps with a fresh read of the saved photos. Notes and tags stay.'
+						: 'Replaces the ingredients and steps with a fresh read of the saved page. Notes and tags stay.'}
 			>
 				{#if busy === 'renormalise'}
 					{created ? 'Inventing…' : 'Re-reading…'}
@@ -150,7 +153,9 @@
 			<p class="hint">
 				{created
 					? 'Claude is writing another version from your brief. This can take up to a minute.'
-					: 'Claude is reading the saved page again. This can take up to a minute.'}
+					: photographed
+						? 'Claude is reading the saved photos again. This can take up to a minute.'
+						: 'Claude is reading the saved page again. This can take up to a minute.'}
 			</p>
 		{/if}
 
@@ -218,6 +223,13 @@
 	<footer>
 		{#if created}
 			<p>Invented by Claude from: <q>{recipe.prompt}</q></p>
+		{:else if photographed}
+			<p>
+				Read from a recipe book:
+				{#each recipe.photo_ids as photoId, index (photoId)}
+					{index ? ', ' : ''}<a href="/api/photos/{photoId}" target="_blank" rel="noreferrer">page {index + 1}</a>
+				{/each}
+			</p>
 		{:else}
 			<p>From <a href={recipe.source_url} target="_blank" rel="noreferrer">{recipe.source_domain}</a></p>
 		{/if}

@@ -2,6 +2,8 @@
 
 A family recipe library. Paste a recipe URL and the backend fetches the page, pulls the recipe out, and has Claude Haiku 4.5 rewrite it in UK measures with short steps. The recipe is then stored in SQLite.
 
+Recipes can also come from photos of a recipe book page, which Claude Sonnet 5.5 reads at medium effort. Haiku isn't used for photos: in testing it read "700g passata" as "700g pasta" every time, and the result still passed validation. A page costs about $0.03 to read, against about $0.01 for a URL import. The browser shrinks each photo to 1568 pixels on its long edge before sending it, and the photos are kept so "Re-read with Claude" can read them again.
+
 - `backend/`: FastAPI, SQLite, importer pipeline (fetch, extract, normalise, validate, store)
 - `frontend/`: SvelteKit single-page app, built with adapter-static
 
@@ -84,10 +86,10 @@ To work through a report: `show` it to see what went wrong, change the prompt or
 | 15 | No ingredient whose name gives a size in cm or mm is stored with that size as its weight or volume. | `test_validate.py::test_inv15_size_in_name_is_not_stored_as_a_weight` |
 | 16 | Any non-API path that isn't a file returns the app's index.html; paths under /api never do. | `test_ui.py::test_inv16_client_routes_get_the_app`, `test_inv16_api_paths_never_get_the_app` |
 | 17 | A link shared to the app reaches /add as ?url= or inside ?text=, and the add page finds it in either. | `frontend/src/lib/share.test.ts` "invariant 17: …" (two tests) |
-| 18 | Every import, creation or re-read that calls Claude records its token counts and cost, whether it succeeds or fails. | `test_costs.py::test_inv18_successful_import_records_its_cost`, `test_inv18_failed_import_records_both_attempts`, `test_inv18_a_crash_before_the_retry_still_records_the_first_call`, `test_inv18_renormalise_records_its_cost` |
+| 18 | Every import, creation, photo read or re-read that calls Claude records its token counts and cost, whether it succeeds or fails. | `test_costs.py::test_inv18_successful_import_records_its_cost`, `test_inv18_failed_import_records_both_attempts`, `test_inv18_a_crash_before_the_retry_still_records_the_first_call`, `test_inv18_renormalise_records_its_cost`, `test_photo.py::test_inv18_photo_import_records_its_cost` |
 | 19 | The shopping list includes every ingredient exactly once, and a merged line's quantity is the sum of the quantities it replaces. | `frontend/src/lib/shopping.test.ts` "invariant 19: …" (two tests) |
 | 20 | Tin, pan, dish and tray sizes in stored step text and equipment are in inches. | `test_validate.py::test_inv20_tin_sizes_are_in_inches`, `test_inv20_validate_converts_steps_and_equipment` |
-| 21 | Every stored recipe is either imported (source URL, no brief) or created (brief, no source URL). | `test_create.py::test_inv21_every_recipe_is_imported_or_created` |
+| 21 | Every stored recipe is imported (source URL, no brief), created (brief, no source URL) or photographed (neither). | `test_create.py::test_inv21_every_recipe_is_imported_or_created` |
 | 22 | A created recipe is stored exactly like an imported one, and "try again" reuses its brief without fetching anything. | `test_create.py::test_inv22_created_recipe_is_stored_like_an_imported_one`, `test_inv22_try_again_reinvents_from_the_saved_brief` |
 | 23 | Migrating a database that already holds recipes preserves their ingredients, steps and tags. | `test_migrations.py::test_inv23_migrating_keeps_existing_recipe_content` |
 | 24 | Every recipe without a photo gets an illustration, and every course has one. | `frontend/src/lib/course-art.test.ts` "invariant 24: …" (two tests) |
@@ -98,6 +100,8 @@ To work through a report: `show` it to see what went wrong, change the prompt or
 | 29 | Syncing from revision r reports every recipe deleted after r, and never reports as deleted a recipe that exists. | `test_sync.py::test_inv29_deleted_recipes_are_reported`, `test_inv29_a_reused_id_is_not_reported_deleted` |
 | 30 | A sync from revision 0, from another epoch, or from a revision ahead of the server returns the whole library, marked full. | `test_sync.py::test_inv30_a_fresh_device_gets_the_whole_library`, `test_inv30_a_copy_ahead_of_the_server_starts_again`, `test_inv30_a_copy_from_another_epoch_starts_again` |
 | 31 | Applying a sync to a device's copy leaves it holding exactly the server's recipes: deletions before changes, and a full response replaces everything. | `frontend/src/lib/sync.test.ts` "invariant 31: …" (three tests) |
+| 32 | A photographed recipe keeps every photo it was read from, in page order, and re-reading it reads those photos. | `test_photo.py::test_inv32_a_photographed_recipe_keeps_its_photos_in_order`, `test_inv32_try_again_rereads_the_stored_photos` |
+| 33 | Only 1 to 4 JPEG, PNG or WebP photos of at most 3.5 MB each reach Claude; anything else is refused first. | `test_photo.py::test_inv33_bad_uploads_are_refused_before_calling_claude`, `test_inv33_other_formats_are_refused` |
 
 ## Where it runs
 
@@ -159,8 +163,9 @@ and after every change made through it. Each device needs to open the app once o
 wifi to get its first copy. Adding, creating and editing still need the Pi.
 
 A migration bumps the epoch, which makes every device fetch the whole library again. A
-migration that rebuilds a table must recreate that table's triggers from
-`migrations/006_sync.sql`.
+migration that rebuilds a table must drop the sync triggers first and recreate them after, as
+`migrations/007_photographed.sql` does. The service worker also keeps each page photo it has
+shown, so photographed recipes keep their pictures offline.
 
 The icons come from one drawing in `frontend/scripts/icons.mjs`. After changing it, run
 `node scripts/icons.mjs` in `frontend/` and commit what it writes to `static/`.

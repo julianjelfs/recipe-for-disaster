@@ -1,5 +1,7 @@
-"""Get a recipe into the library: import one from a URL, invent one from a brief, or re-read one."""
+"""Get a recipe into the library: import one from a URL, invent one from a brief, read one from
+photos of a recipe book, or re-read one."""
 
+import base64
 import sqlite3
 from collections.abc import Callable
 
@@ -10,6 +12,7 @@ from app.importer.create import invent_recipe
 from app.importer.extract import Extract, ExtractError, extract, restore
 from app.importer.fetch import FetchError, canonicalise_url, fetch_html
 from app.importer.normalise import NormaliseError, Usage, normalise
+from app.importer.photo import read_photos
 from app.importer.validate import ValidationFailed
 from app.schemas import Recipe
 
@@ -103,8 +106,50 @@ def create_recipe(conn: sqlite3.Connection, brief: str, client: anthropic.Anthro
         )
 
 
+def _encoded(photos: list[tuple[str, bytes]]) -> list[tuple[str, str]]:
+    return [(media_type, base64.standard_b64encode(data).decode()) for media_type, data in photos]
+
+
+def import_photos(conn: sqlite3.Connection, photos: list[tuple[str, bytes]], client: anthropic.Anthropic) -> Recipe:
+    """Read a recipe from photos of a printed page, (media type, bytes) in page order, and store it
+    with its photos so it can be read again later without a new picture."""
+    usage = Usage()
+    recipe_id: int | None = None
+    try:
+        try:
+            result = read_photos(_encoded(photos), client, config.PHOTO_MODEL, usage)
+        except (ValidationFailed, NormaliseError) as error:
+            reports.record_failure(
+                conn, source_url=None, error=error, extract=None, model=config.PHOTO_MODEL,
+                comment=f"Read from {len(photos)} photo(s) of a recipe book",
+            )
+            raise
+        recipe_id = store.insert_recipe(
+            conn,
+            source_url=None,
+            recipe=result.recipe,
+            extract=None,
+            model=config.PHOTO_MODEL,
+            parse_version=config.PARSE_VERSION,
+            origin="photographed",
+            photos=photos,
+        )
+        return store.get_recipe(conn, recipe_id)
+    finally:
+        costs.record(
+            conn,
+            purpose="photo",
+            source_url=None,
+            recipe_id=recipe_id,
+            succeeded=recipe_id is not None,
+            model=config.PHOTO_MODEL,
+            usage=usage,
+        )
+
+
 def renormalise_recipe(conn: sqlite3.Connection, recipe_id: int, client: anthropic.Anthropic) -> Recipe | None:
-    """Ask Claude for this recipe again: the saved page for an import, the saved brief for a creation.
+    """Ask Claude for this recipe again: the saved page for an import, the saved brief for a creation,
+    the saved photos for a photographed recipe.
 
     Never fetches anything. Returns None if there is no such recipe; on failure the recipe is left
     as it was and the failure is recorded. Notes and custom tags survive either way.
@@ -112,28 +157,31 @@ def renormalise_recipe(conn: sqlite3.Connection, recipe_id: int, client: anthrop
     raw = store.get_raw(conn, recipe_id)
     if raw is None:
         return None
-    created = raw["origin"] == "created"
-    page = None if created else restore(raw["raw_extract"], raw["raw_text"])
+    origin = raw["origin"]
+    page = restore(raw["raw_extract"], raw["raw_text"]) if origin == "imported" else None
+    model = config.PHOTO_MODEL if origin == "photographed" else config.MODEL
 
     usage = Usage()
     succeeded = False
     try:
         try:
-            if created:
-                result = invent_recipe(raw["prompt"], client, config.MODEL, usage)
+            if origin == "created":
+                result = invent_recipe(raw["prompt"], client, model, usage)
+            elif origin == "photographed":
+                result = read_photos(_encoded(store.get_photos(conn, recipe_id)), client, model, usage)
             else:
-                result = normalise(page, client, config.MODEL, usage)
+                result = normalise(page, client, model, usage)
         except (ValidationFailed, NormaliseError) as error:
             reports.record_failure(
                 conn,
                 source_url=raw["source_url"],
                 error=error,
                 extract=page,
-                model=config.MODEL,
+                model=model,
                 comment=raw["prompt"] or "",
             )
             raise
-        store.replace_recipe(conn, recipe_id, result.recipe, model=config.MODEL, parse_version=config.PARSE_VERSION)
+        store.replace_recipe(conn, recipe_id, result.recipe, model=model, parse_version=config.PARSE_VERSION)
         succeeded = True
     finally:
         costs.record(
@@ -142,7 +190,7 @@ def renormalise_recipe(conn: sqlite3.Connection, recipe_id: int, client: anthrop
             source_url=raw["source_url"],
             recipe_id=recipe_id,
             succeeded=succeeded,
-            model=config.MODEL,
+            model=model,
             usage=usage,
         )
     return store.get_recipe(conn, recipe_id)

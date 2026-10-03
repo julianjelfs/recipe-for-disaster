@@ -10,6 +10,11 @@ load_dotenv(BACKEND_DIR / ".env")
 
 DB_PATH = Path(os.environ.get("RECIPE_DB_PATH") or BACKEND_DIR / "recipes.db")
 MODEL = os.environ.get("RECIPE_MODEL") or "claude-haiku-4-5"
+# Reading a photo of a printed page needs a stronger eye than tidying a web page: in testing,
+# Haiku read "700g passata" as "700g pasta" every time. Medium effort was as accurate as high
+# at two-thirds of the cost.
+PHOTO_MODEL = os.environ.get("RECIPE_PHOTO_MODEL") or "claude-sonnet-5-5"
+PHOTO_EFFORT = "medium"
 # The built frontend. Missing in a checkout that hasn't been built; use the Vite dev server then.
 UI_DIR = Path(os.environ.get("RECIPE_UI_DIR") or BACKEND_DIR.parent / "frontend" / "build")
 

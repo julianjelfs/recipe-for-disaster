@@ -7,11 +7,11 @@
  * Lets the app open away from the home network, where the Pi can't be reached: out shopping with
  * the list, or cooking at someone else's house.
  *
- * This only caches the app itself (HTML, JS, CSS, icons). The recipes are the app's own business:
- * it keeps a copy of the library in IndexedDB and syncs it (see lib/library.svelte.ts), so API
- * requests pass straight through.
+ * This caches the app itself (HTML, JS, CSS, icons) and the page photos of photographed recipes.
+ * The recipes are the app's own business: it keeps a copy of the library in IndexedDB and syncs it
+ * (see lib/library.svelte.ts), so other API requests pass straight through.
  *
- * Recipe photos are hotlinked from the sites they came from, which usually still load over mobile
+ * Imported recipes' photos are hotlinked from the sites they came from, which usually load over mobile
  * data. They aren't saved: a browser counts each cross-site image as megabytes of storage, and
  * running out would throw away the saved recipes with them.
  */
@@ -22,6 +22,8 @@ const sw = self as unknown as ServiceWorkerGlobalScope;
 
 const SHELL = `shell-${version}`;
 const SHELL_FILES = ['/', ...build, ...files];
+// Kept across versions. A photo's id is never reused, so its bytes never change.
+const PHOTOS = 'photos';
 
 // Off the home network the Pi's name doesn't resolve, which fails fast. A weak signal can hang
 // instead, so give up after this long and use the cached page.
@@ -44,7 +46,7 @@ sw.addEventListener('activate', (event) => {
 	event.waitUntil(
 		(async () => {
 			for (const key of await caches.keys()) {
-				if (key !== SHELL) await caches.delete(key);
+				if (key !== SHELL && key !== PHOTOS) await caches.delete(key);
 			}
 			await sw.clients.claim();
 		})()
@@ -54,9 +56,13 @@ sw.addEventListener('activate', (event) => {
 sw.addEventListener('fetch', (event) => {
 	const request = event.request;
 	const url = new URL(request.url);
-	if (request.method !== 'GET' || url.origin !== sw.location.origin || url.pathname.startsWith('/api/')) return;
+	if (request.method !== 'GET' || url.origin !== sw.location.origin) return;
 
-	if (request.mode === 'navigate') {
+	if (url.pathname.startsWith('/api/photos/')) {
+		event.respondWith(photo(request));
+	} else if (url.pathname.startsWith('/api/')) {
+		return;
+	} else if (request.mode === 'navigate') {
 		event.respondWith(navigate(request));
 	} else {
 		event.respondWith(asset(request));
@@ -73,6 +79,16 @@ async function navigate(request: Request): Promise<Response> {
 async function asset(request: Request): Promise<Response> {
 	const cached = await caches.match(request, { cacheName: SHELL });
 	return cached ?? fetch(request);
+}
+
+/** A page photo: from the cache once seen, so it shows away from home too. */
+async function photo(request: Request): Promise<Response> {
+	const cache = await caches.open(PHOTOS);
+	const cached = await cache.match(request);
+	if (cached) return cached;
+	const response = await fetch(request);
+	if (response.ok) await cache.put(request, response.clone());
+	return response;
 }
 
 /**

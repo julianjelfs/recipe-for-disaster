@@ -216,8 +216,8 @@
 					<span class="meta">
 						{#if recipe.total_minutes !== null}<span>{formatMinutes(recipe.total_minutes)} ·</span>{/if}
 						<span>Complexity {recipe.complexity}/5</span>
-						{#if recipe.source_domain ?? recipe.origin === 'created'}
-							<span class="source">· {recipe.source_domain ?? 'Created'}</span>
+						{#if recipe.source_domain ?? recipe.origin !== 'imported'}
+							<span class="source">· {recipe.source_domain ?? (recipe.origin === 'created' ? 'Created' : 'Recipe book')}</span>
 						{/if}
 					</span>
 				</a>

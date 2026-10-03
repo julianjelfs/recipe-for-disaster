@@ -34,8 +34,10 @@ def insert_recipe(
     parse_version: int,
     origin: str = "imported",
     prompt: str | None = None,
+    photos: list[tuple[str, bytes]] | None = None,
 ) -> int:
-    """Store a recipe. Imported ones have a source_url and an extract; created ones have a prompt."""
+    """Store a recipe. Imported ones have a source_url and an extract; created ones have a prompt;
+    photographed ones have their photos, as (media type, bytes) in page order."""
     with conn:
         cursor = conn.execute(
             """
@@ -67,7 +69,32 @@ def insert_recipe(
         )
         recipe_id = cursor.lastrowid
         _insert_content(conn, recipe_id, recipe)
+        if photos:
+            photo_ids = [
+                conn.execute(
+                    "INSERT INTO recipe_photos (recipe_id, position, media_type, data) VALUES (?, ?, ?, ?)",
+                    (recipe_id, position, media_type, data),
+                ).lastrowid
+                for position, (media_type, data) in enumerate(photos)
+            ]
+            # The first page is the recipe's picture.
+            conn.execute("UPDATE recipes SET image_url = ? WHERE id = ?", (f"/api/photos/{photo_ids[0]}", recipe_id))
     return recipe_id
+
+
+def get_photos(conn: sqlite3.Connection, recipe_id: int) -> list[tuple[str, bytes]]:
+    """A photographed recipe's photos, as (media type, bytes) in page order."""
+    return [
+        (row["media_type"], row["data"])
+        for row in conn.execute(
+            "SELECT media_type, data FROM recipe_photos WHERE recipe_id = ? ORDER BY position", (recipe_id,)
+        )
+    ]
+
+
+def get_photo(conn: sqlite3.Connection, photo_id: int) -> tuple[str, bytes] | None:
+    row = conn.execute("SELECT media_type, data FROM recipe_photos WHERE id = ?", (photo_id,)).fetchone()
+    return (row["media_type"], row["data"]) if row else None
 
 
 def replace_recipe(
@@ -205,5 +232,8 @@ def get_recipe(conn: sqlite3.Connection, recipe_id: int) -> Recipe | None:
             "equipment": tags["equipment"],
             "techniques": tags["technique"],
             "tags": tags["custom"],
+            "photo_ids": [
+                r["id"] for r in conn.execute("SELECT id FROM recipe_photos WHERE recipe_id = ? ORDER BY position", (recipe_id,))
+            ],
         }
     )

@@ -1,5 +1,7 @@
 """FastAPI app. JSON API under /api, and the built frontend everywhere else."""
 
+import base64
+import binascii
 import os
 import sqlite3
 from collections.abc import Callable, Iterator
@@ -13,13 +15,14 @@ from app import config, db, reports, store, sync
 from app.importer.extract import ExtractError
 from app.importer.fetch import FetchError, InvalidUrl, fetch_html
 from app.importer.normalise import NormaliseError
-from app.importer.pipeline import create_recipe, import_url, renormalise_recipe
+from app.importer.pipeline import create_recipe, import_photos, import_url, renormalise_recipe
 from app.importer.validate import ValidationFailed, validate
 from app.schemas import (
     CreateRequest,
     FlagCreated,
     FlagRequest,
     ImportRequest,
+    PhotoRequest,
     Recipe,
     RecipeEdit,
     SyncResponse,
@@ -28,6 +31,13 @@ from app.ui import UiFiles
 
 # Long enough for a detailed brief, short enough that nobody pastes an essay into a Claude call.
 MAX_BRIEF = 500
+# A recipe rarely runs past two pages; four leaves room for a photo of each half of a spread.
+MAX_PHOTOS = 4
+# Claude takes images up to 5 MB, counted as base64, which is 4/3 of the bytes. The app shrinks
+# photos to a few hundred kilobytes before sending, so only a photo sent some other way gets near.
+MAX_PHOTO_BYTES = 3_750_000
+# How each accepted format starts, so a mislabelled or broken upload fails here, not at Claude.
+_PHOTO_SIGNATURES = {"image/jpeg": (b"\xff\xd8\xff",), "image/png": (b"\x89PNG\r\n\x1a\n",), "image/webp": (b"RIFF",)}
 
 
 @asynccontextmanager
@@ -120,6 +130,40 @@ def create_from_brief(
         raise api_error(422, f"That brief is {len(brief)} characters. Keep it under {MAX_BRIEF}.")
     with importer_errors():
         return create_recipe(conn, brief, client)
+
+
+@app.post("/api/photo", status_code=201, response_model=Recipe)
+def import_from_photos(
+    body: PhotoRequest,
+    conn: sqlite3.Connection = Depends(get_conn),
+    client: anthropic.Anthropic = Depends(get_client),
+) -> Recipe:
+    """Read a recipe from photos of a recipe book page, in page order."""
+    if not 1 <= len(body.photos) <= MAX_PHOTOS:
+        raise api_error(422, f"Send between 1 and {MAX_PHOTOS} photos of the recipe.")
+    photos: list[tuple[str, bytes]] = []
+    for number, photo in enumerate(body.photos, start=1):
+        try:
+            data = base64.b64decode(photo.data, validate=True)
+        except binascii.Error as error:
+            raise api_error(422, f"Photo {number} isn't valid base64.") from error
+        if len(data) > MAX_PHOTO_BYTES:
+            raise api_error(422, f"Photo {number} is {len(data) // 1_000_000} MB. Keep each photo under 3.5 MB.")
+        if not data.startswith(_PHOTO_SIGNATURES[photo.media_type]):
+            raise api_error(422, f"Photo {number} isn't a {photo.media_type.removeprefix('image/').upper()} image.")
+        photos.append((photo.media_type, data))
+    with importer_errors():
+        return import_photos(conn, photos, client)
+
+
+@app.get("/api/photos/{photo_id}")
+def read_photo(photo_id: int, conn: sqlite3.Connection = Depends(get_conn)) -> Response:
+    """A stored page photo. Photo ids are never reused, so the phone may keep it for good."""
+    photo = store.get_photo(conn, photo_id)
+    if photo is None:
+        raise api_error(404, "Photo not found.")
+    media_type, data = photo
+    return Response(data, media_type=media_type, headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 @app.get("/api/sync", response_model=SyncResponse)

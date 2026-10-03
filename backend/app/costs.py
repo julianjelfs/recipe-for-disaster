@@ -27,6 +27,7 @@ class Price:
 # Anthropic list prices as of September 2026. Calls to a model missing here are recorded with no cost.
 PRICES = {
     "claude-haiku-4-5": Price(input=1.00, output=5.00),
+    "claude-sonnet-5-5": Price(input=2.00, output=10.00),
     "claude-sonnet-5": Price(input=2.00, output=10.00),
     "claude-opus-5": Price(input=5.00, output=25.00),
 }

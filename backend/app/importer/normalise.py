@@ -131,10 +131,11 @@ class NormaliseResult:
 
 def ask(
     system: str,
-    user_content: str,
+    user_content: str | list[dict],
     client: anthropic.Anthropic,
     model: str = config.MODEL,
     usage: Usage | None = None,
+    effort: str | None = None,
 ) -> NormaliseResult:
     """Ask Claude for a NormalisedRecipe. On validation failure, retry once with the errors.
 
@@ -144,6 +145,7 @@ def ask(
     """
     usage = usage if usage is not None else Usage()
     messages: list[dict] = [{"role": "user", "content": user_content}]
+    extra = {"output_config": {"effort": effort}} if effort else {}
     for attempt in range(1, MAX_ATTEMPTS + 1):
         response = client.messages.parse(
             model=model,
@@ -151,6 +153,7 @@ def ask(
             system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             messages=messages,
             output_format=NormalisedRecipe,
+            **extra,
         )
         usage.add(response.usage)
         if response.stop_reason != "end_turn" or response.parsed_output is None:

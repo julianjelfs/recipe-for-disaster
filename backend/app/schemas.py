@@ -12,8 +12,9 @@ UK_UNITS: tuple[str, ...] = get_args(Unit)
 
 Course = Literal["breakfast", "starter", "main", "side", "dessert", "baking", "snack", "drink", "sauce"]
 Diet = Literal["vegetarian", "vegan", "gluten-free", "dairy-free", "nut-free"]
-# Imported from a URL, or invented by Claude from a brief.
-Origin = Literal["imported", "created"]
+# Imported from a URL, invented by Claude from a brief, or read from photos of a recipe book.
+Origin = Literal["imported", "created", "photographed"]
+PhotoType = Literal["image/jpeg", "image/png", "image/webp"]
 
 
 # Models the LLM fills in. Every field is required (no defaults) so structured outputs
@@ -116,6 +117,8 @@ class Recipe(BaseModel):
     updated_at: str
     ingredients: list[Ingredient]
     steps: list[Step]
+    # A photographed recipe's photos, in page order: GET /api/photos/{id}. Empty for the others.
+    photo_ids: list[int] = []
 
 
 class SyncResponse(BaseModel):
@@ -133,6 +136,17 @@ class SyncResponse(BaseModel):
 
 class ImportRequest(BaseModel):
     url: str
+
+
+class Photo(BaseModel):
+    media_type: PhotoType
+    # Base64. JSON rather than a multipart upload: a page photo shrunk by the browser is a few
+    # hundred kilobytes, and this needs no extra dependency.
+    data: str
+
+
+class PhotoRequest(BaseModel):
+    photos: list[Photo]
 
 
 class CreateRequest(BaseModel):

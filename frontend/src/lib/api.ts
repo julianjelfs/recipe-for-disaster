@@ -1,4 +1,5 @@
 import { ready, sync } from './library.svelte';
+import type { PhotoUpload } from './photos';
 
 export const UNITS = [
 	'g', 'kg', 'ml', 'l', 'tsp', 'tbsp',
@@ -7,8 +8,8 @@ export const UNITS = [
 export const COURSES = ['breakfast', 'starter', 'main', 'side', 'dessert', 'baking', 'snack', 'drink', 'sauce'] as const;
 export const DIETS = ['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'nut-free'] as const;
 
-/** Imported from a URL, or invented by Claude from a brief. */
-export type Origin = 'imported' | 'created';
+/** Imported from a URL, invented by Claude from a brief, or read from photos of a recipe book. */
+export type Origin = 'imported' | 'created' | 'photographed';
 
 export interface Ingredient {
 	id: number;
@@ -57,6 +58,8 @@ export interface Recipe {
 	updated_at: string;
 	ingredients: Ingredient[];
 	steps: Step[];
+	/** A photographed recipe's page photos, in order: /api/photos/{id}. Empty for the others. */
+	photo_ids: number[];
 }
 
 export interface RecipeSummary {
@@ -169,6 +172,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export function importRecipe(url: string): Promise<Recipe> {
 	return request<Recipe>('/import', { method: 'POST', body: JSON.stringify({ url }) });
+}
+
+/** Read a recipe from photos of a recipe book page, in page order (see photos.ts). */
+export function photographRecipe(photos: PhotoUpload[]): Promise<Recipe> {
+	return request<Recipe>('/photo', { method: 'POST', body: JSON.stringify({ photos }) });
 }
 
 export function createRecipe(brief: string): Promise<Recipe> {

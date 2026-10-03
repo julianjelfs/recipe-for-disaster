@@ -30,7 +30,7 @@ def test_creating_stores_the_recipe_and_the_brief(conn):
 
 
 def test_inv21_every_recipe_is_imported_or_created(conn):
-    """Invariant 21: a recipe is imported (URL, no prompt) or created (prompt, no URL), never a mixture."""
+    """Invariant 21: a recipe is imported (URL, no prompt), created (prompt, no URL) or photographed (neither), never a mixture."""
     imported = add_recipe(conn, BBC_URL)
     created = create_recipe(conn, BRIEF, FakeClient(make_recipe()))
     rows = conn.execute("SELECT origin, source_url, prompt FROM recipes ORDER BY id").fetchall()
@@ -48,6 +48,9 @@ def test_inv21_every_recipe_is_imported_or_created(conn):
         (None, None, "imported", "invent me a cake", "x", 1, "m", 1),
         # Neither.
         (None, None, "created", None, "x", 1, "m", 1),
+        # Photographed, but with a URL or a brief.
+        ("https://x.example/", "x.example", "photographed", None, "x", 1, "m", 1),
+        (None, None, "photographed", "invent me a cake", "x", 1, "m", 1),
     ):
         with pytest.raises(sqlite3.IntegrityError), conn:
             conn.execute(f"INSERT INTO recipes ({columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", values)
