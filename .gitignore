@@ -16,3 +16,6 @@ frontend/node_modules/
 frontend/.svelte-kit/
 frontend/build/
 *.db.backup-*
+
+# Sample photos for trying imports by hand. Often photos of published books, so never committed.
+assets/
