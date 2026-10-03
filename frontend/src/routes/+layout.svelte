@@ -15,8 +15,8 @@
 			Recipe for Disaster
 		</a>
 		<nav>
-			<a href="/add">Add recipe</a>
-			<a href="/create">Create recipe</a>
+			<a class="button" href="/add">Add recipe</a>
+			<a class="button" href="/create">Create recipe</a>
 		</nav>
 	</header>
 {/if}
@@ -29,8 +29,9 @@
 	.site {
 		display: flex;
 		align-items: center;
+		flex-wrap: wrap;
 		justify-content: space-between;
-		gap: 1rem;
+		gap: 0.75rem 1rem;
 		max-width: var(--page-width);
 		margin: 0 auto;
 		padding: 1rem;
@@ -39,7 +40,15 @@
 
 	nav {
 		display: flex;
-		gap: 1.25rem;
+		gap: 0.5rem;
+	}
+
+	/* Outlined, so the header doesn't shout over the page's own buttons. */
+	nav .button {
+		padding: 0.45rem 0.85rem;
+		border: 1px solid var(--accent);
+		background: transparent;
+		color: var(--accent);
 	}
 
 	.brand {
