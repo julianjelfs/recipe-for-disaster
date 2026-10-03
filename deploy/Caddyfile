@@ -8,7 +8,7 @@
 # The token lives in /etc/caddy/cloudflare.env, root-readable only, scoped to Zone -> DNS
 # -> Edit on this one zone.
 #
-# Both A records point at the Pi's private address (192.168.68.69) and must be "DNS only"
+# Every A record points at the Pi's private address (192.168.68.69) and must be "DNS only"
 # in Cloudflare. A proxied record cannot point at a private address.
 
 (house) {
@@ -30,4 +30,9 @@ recipes.julianjelfs.co.uk {
 triads.julianjelfs.co.uk {
 	import house
 	reverse_proxy 127.0.0.1:8000
+}
+
+hive.julianjelfs.co.uk {
+	import house
+	reverse_proxy 127.0.0.1:8030
 }
