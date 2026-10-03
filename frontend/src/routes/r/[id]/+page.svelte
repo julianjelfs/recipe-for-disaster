@@ -8,11 +8,15 @@
 	import { deleteRecipe, flagRecipe, renormaliseRecipe, toApiError, type ApiError, type Ingredient } from '$lib/api';
 	import { formatAmount, formatMinutes } from '$lib/format';
 	import { parseScale, scaleAmount } from '$lib/scale';
+	import { keepScreenOn } from '$lib/wakelock';
 
 	let { data } = $props();
 	const recipe = $derived(data.recipe);
 	const created = $derived(recipe.origin === 'created');
 	const photographed = $derived(recipe.origin === 'photographed');
+
+	// Plenty of people cook from this page rather than cooking mode, so it keeps the screen on too.
+	$effect(() => keepScreenOn(() => {}));
 
 	let scale = $state(untrack(() => parseScale(page.url.searchParams.get('scale'))));
 	const cookHref = $derived(`/r/${recipe.id}/cook${scale === 1 ? '' : `?scale=${scale}`}`);

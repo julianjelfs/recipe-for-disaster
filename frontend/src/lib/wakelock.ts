@@ -1,6 +1,7 @@
 /**
- * Keep the screen on while cooking. The browser drops the lock when the tab is hidden,
- * so take it again each time the page becomes visible. Returns a function that stops.
+ * Keep the screen on while a recipe is open, on its page or in cooking mode. The browser drops
+ * the lock when the tab is hidden, so take it again each time the page becomes visible. Returns
+ * a function that stops.
  */
 export function keepScreenOn(onChange: (active: boolean) => void): () => void {
 	let sentinel: WakeLockSentinel | null = null;
