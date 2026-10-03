@@ -109,8 +109,13 @@
 
 	<div class="row">
 		{#if photos.length < MAX_PHOTOS}
+			<!-- Two inputs: on Android, `multiple` hides the camera, and `capture` hides the library. -->
+			<label class="pick" class:primary={!photos.length} class:disabled={busy !== null}>
+				{photos.length ? 'Photograph next page' : 'Take a photo'}
+				<input type="file" accept="image/*" capture="environment" onchange={addPhotos} disabled={busy !== null} />
+			</label>
 			<label class="pick" class:disabled={busy !== null}>
-				{photos.length ? 'Add another page' : 'Take or choose a photo'}
+				Choose from library
 				<input type="file" accept="image/*" multiple onchange={addPhotos} disabled={busy !== null} />
 			</label>
 		{/if}
@@ -216,6 +221,16 @@
 		width: 1px;
 		height: 1px;
 		opacity: 0;
+	}
+
+	.pick.primary {
+		border-color: var(--accent);
+		background: var(--accent);
+		color: var(--accent-fg);
+	}
+
+	.photos .row {
+		flex-wrap: wrap;
 	}
 
 	.pick.disabled {
