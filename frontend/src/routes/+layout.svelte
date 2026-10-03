@@ -49,7 +49,7 @@
 		gap: 0.75rem 1rem;
 		max-width: var(--page-width);
 		margin: 0 auto;
-		padding: 1rem;
+		padding: 0.9rem 1.25rem;
 		border-bottom: 1px solid var(--line);
 	}
 
@@ -61,15 +61,19 @@
 	/* Outlined, so the header doesn't shout over the page's own buttons. */
 	nav .button {
 		padding: 0.45rem 0.85rem;
-		border: 1px solid var(--accent);
-		background: transparent;
-		color: var(--accent);
+		border: 1px solid var(--edge);
+		background: var(--card);
+		color: var(--fg);
+	}
+
+	nav .button:hover {
+		border-color: var(--muted);
 	}
 
 	.away {
 		max-width: var(--page-width);
 		margin: 0 auto;
-		padding: 0.5rem 1rem;
+		padding: 0.5rem 1.25rem;
 		border-bottom: 1px solid var(--line);
 		color: var(--muted);
 		font-size: 0.9rem;
@@ -80,11 +84,13 @@
 		align-items: center;
 		gap: 0.5rem;
 		color: var(--fg);
+		font-family: var(--serif);
+		font-size: 1.3rem;
 		font-weight: 700;
 		text-decoration: none;
 	}
 
 	.brand img {
-		border-radius: 0.4rem;
+		border-radius: 7px;
 	}
 </style>

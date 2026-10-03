@@ -301,8 +301,10 @@
 
 	.text {
 		margin: 0 0 1.5rem;
+		font-family: var(--serif);
 		font-size: clamp(1.6rem, 4.5vw, 3rem);
-		line-height: 1.35;
+		font-weight: 500;
+		line-height: 1.3;
 	}
 
 	.uses {
@@ -316,10 +318,9 @@
 	}
 
 	.uses li {
-		padding: 0.35rem 0.8rem;
-		border: 1px solid var(--line);
+		padding: 0.35rem 0.85rem;
 		border-radius: 999px;
-		background: var(--card);
+		background: var(--soft);
 	}
 
 	.scale-note {
@@ -365,6 +366,7 @@
 
 	.step-link.current {
 		border-color: var(--accent);
+		background: var(--accent-soft);
 	}
 
 	.timers {
@@ -381,9 +383,9 @@
 		align-items: center;
 		gap: 0.75rem;
 		padding: 0.4rem 0.9rem;
-		border: 1px solid var(--line);
+		border: 1px solid transparent;
 		border-radius: 999px;
-		background: var(--card);
+		background: var(--soft);
 	}
 
 	.clock {
@@ -414,5 +416,17 @@
 	.controls button {
 		padding: 1.1rem;
 		font-size: 1.3rem;
+	}
+
+	/* Smaller header buttons on a phone, so the recipe title keeps its room. */
+	@media (max-width: 32rem) {
+		header {
+			gap: 0.5rem;
+		}
+
+		header button {
+			padding: 0.45rem 0.65rem;
+			font-size: 0.85rem;
+		}
 	}
 </style>

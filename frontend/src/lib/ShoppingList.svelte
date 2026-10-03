@@ -85,7 +85,7 @@
 		max-height: 85vh;
 		padding: 1rem 1.25rem 1.25rem;
 		border: 0;
-		border-radius: 0.75rem;
+		border-radius: 12px;
 		background: var(--card);
 		color: var(--fg);
 	}

@@ -107,9 +107,10 @@
 		gap: 0.35rem;
 		padding: 0.2rem 0.4rem 0.2rem 0.7rem;
 		border-radius: 999px;
-		background: var(--accent);
-		color: var(--accent-fg);
+		background: var(--accent-soft);
+		color: var(--accent);
 		font-size: 0.9rem;
+		font-weight: 500;
 	}
 
 	.chip button {
@@ -140,9 +141,9 @@
 		margin: 0;
 		padding: 0.25rem;
 		border: 1px solid var(--line);
-		border-radius: 0.5rem;
+		border-radius: var(--radius);
 		background: var(--card);
-		box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+		box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
 		list-style: none;
 	}
 
@@ -153,7 +154,7 @@
 	}
 
 	li.active {
-		background: var(--accent);
-		color: var(--accent-fg);
+		background: var(--accent-soft);
+		color: var(--accent);
 	}
 </style>

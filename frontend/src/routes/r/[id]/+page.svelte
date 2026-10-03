@@ -271,14 +271,14 @@
 	.picture {
 		display: grid;
 		width: 100%;
-		max-height: 20rem;
+		max-height: 22rem;
 		overflow: hidden;
-		border-radius: 0.75rem;
+		border-radius: 12px;
 	}
 
 	.picture :global(img) {
 		width: 100%;
-		max-height: 20rem;
+		max-height: 22rem;
 		object-fit: cover;
 	}
 
@@ -286,7 +286,11 @@
 	   being cropped to the width of the page. */
 	.picture :global(.art) {
 		height: 8rem;
-		border-radius: 0.75rem;
+		border-radius: 12px;
+	}
+
+	h1 {
+		margin: 1.25rem 0 0.75rem;
 	}
 
 	.picture :global(.art img) {
@@ -298,23 +302,36 @@
 	.labels {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.5rem;
 		padding: 0;
 		list-style: none;
 	}
 
-	.facts li,
-	.labels li {
-		padding: 0.15rem 0.6rem;
-		border: 1px solid var(--line);
-		border-radius: 999px;
+	/* Facts read as one line of text, split by dots. */
+	.facts {
+		gap: 0.25rem 0;
 		color: var(--muted);
-		font-size: 0.9rem;
+	}
+
+	.facts li + li::before {
+		content: '·';
+		margin: 0 0.5rem;
 	}
 
 	.facts li.invented {
-		border-color: var(--accent);
 		color: var(--accent);
+		font-weight: 600;
+	}
+
+	.labels {
+		gap: 0.4rem;
+	}
+
+	.labels li {
+		padding: 0.15rem 0.65rem;
+		border-radius: 999px;
+		background: var(--soft);
+		color: var(--muted);
+		font-size: 0.88rem;
 	}
 
 	.actions {
@@ -322,6 +339,7 @@
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.5rem;
+		margin-top: 1.25rem;
 	}
 
 	.hint {
@@ -335,7 +353,8 @@
 	.columns {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-		gap: 2rem;
+		gap: 2.5rem;
+		margin-top: 1.5rem;
 	}
 
 	/* Ingredients stay in view while you read down a long method. A list taller than the
@@ -371,7 +390,11 @@
 
 	h3 {
 		margin-bottom: 0.25rem;
-		font-size: 1rem;
+		font-family: inherit;
+		font-size: 0.85rem;
+		font-weight: 600;
+		letter-spacing: 0.03em;
+		text-transform: uppercase;
 		color: var(--muted);
 	}
 
@@ -389,9 +412,19 @@
 		font-weight: 600;
 	}
 
+	.steps {
+		padding-left: 1.5rem;
+	}
+
 	.steps li {
-		margin-bottom: 0.75rem;
-		padding-left: 0.25rem;
+		max-width: 65ch;
+		margin-bottom: 1rem;
+		padding-left: 0.5rem;
+	}
+
+	.steps li::marker {
+		color: var(--accent);
+		font-weight: 700;
 	}
 
 	footer {

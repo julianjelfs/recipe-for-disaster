@@ -26,13 +26,13 @@
 	.art {
 		display: grid;
 		place-items: center;
-		background: var(--line);
+		background: var(--art);
 	}
 
 	.art img {
-		width: 44%;
+		width: 40%;
 		height: auto;
-		opacity: 0.85;
+		opacity: 0.9;
 	}
 
 	.visually-hidden {

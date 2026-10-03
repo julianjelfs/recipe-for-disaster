@@ -1,28 +1,61 @@
+/* Inter for reading and controls, Source Serif for headings and recipe titles. Both are served
+   from static/ so the app looks the same away from home. */
+@font-face {
+	font-family: 'Inter';
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: swap;
+	src: url('/fonts/inter.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Source Serif 4';
+	font-style: normal;
+	font-weight: 500 700;
+	font-display: swap;
+	src: url('/fonts/source-serif-4.woff2') format('woff2');
+}
+
 :root {
 	color-scheme: light dark;
-	--bg: #fbfaf7;
+	--bg: #ffffff;
 	--card: #ffffff;
-	--fg: #1f1d1a;
-	--muted: #6b665e;
-	--line: #e4e0d8;
-	--accent: #b4442b;
+	/* Quiet fills: tags, empty picture tiles, the filters panel. */
+	--soft: #f3f3f0;
+	--fg: #1d1d1b;
+	--muted: #6b6b66;
+	--line: #e6e6e3;
+	/* Borders on inputs and outlined buttons. */
+	--edge: #d3d3cd;
+	--accent: #c2410c;
 	--accent-fg: #ffffff;
-	--danger-bg: #fbeae6;
-	--page-width: 60rem;
-	font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--accent-soft: #fdece3;
+	/* The tile behind a course drawing when a recipe has no photo. */
+	--art: #f5e3d6;
+	--danger: #b3261e;
+	--danger-bg: #fbeae8;
+	--radius: 8px;
+	--page-width: 64rem;
+	--serif: 'Source Serif 4', Georgia, serif;
+	font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 	line-height: 1.5;
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--bg: #171614;
-		--card: #211f1c;
-		--fg: #ece8e1;
-		--muted: #a39d93;
-		--line: #33302b;
-		--accent: #e5775c;
-		--accent-fg: #171614;
-		--danger-bg: #3a211b;
+		--bg: #161716;
+		--card: #1e201e;
+		--soft: #242624;
+		--fg: #ecebe7;
+		--muted: #a3a39c;
+		--line: #2e302e;
+		--edge: #43463f;
+		--accent: #fb923c;
+		--accent-fg: #1f1209;
+		--accent-soft: #3a2417;
+		--art: #33241a;
+		--danger: #f2857a;
+		--danger-bg: #3a1f1c;
 	}
 }
 
@@ -36,22 +69,36 @@ body {
 	margin: 0;
 	background: var(--bg);
 	color: var(--fg);
+	-webkit-font-smoothing: antialiased;
+}
+
+::selection {
+	background: var(--accent-soft);
 }
 
 main {
 	max-width: var(--page-width);
 	margin: 0 auto;
-	padding: 1rem;
+	padding: 1.25rem 1.25rem 3rem;
 }
 
 a {
 	color: var(--accent);
+	text-underline-offset: 2px;
 }
 
 h1,
 h2,
 h3 {
-	line-height: 1.2;
+	font-family: var(--serif);
+	line-height: 1.15;
+	text-wrap: balance;
+}
+
+h1 {
+	font-size: clamp(1.9rem, 4vw, 2.75rem);
+	font-weight: 700;
+	letter-spacing: -0.01em;
 }
 
 input,
@@ -65,20 +112,45 @@ textarea {
 input,
 select,
 textarea {
-	padding: 0.6rem 0.75rem;
-	border: 1px solid var(--line);
-	border-radius: 0.5rem;
+	padding: 0.6rem 0.8rem;
+	border: 1px solid var(--edge);
+	border-radius: var(--radius);
 	background: var(--card);
+}
+
+input::placeholder,
+textarea::placeholder {
+	color: var(--muted);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+	border-color: var(--accent);
+	outline: 2px solid var(--accent-soft);
+	outline-offset: 0;
+}
+
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+input[type='checkbox'] {
+	accent-color: var(--accent);
 }
 
 button {
 	padding: 0.6rem 1rem;
 	border: 0;
-	border-radius: 0.5rem;
+	border-radius: var(--radius);
 	background: var(--accent);
 	color: var(--accent-fg);
 	font-weight: 600;
 	cursor: pointer;
+	transition:
+		background-color 0.15s,
+		border-color 0.15s;
 }
 
 button:disabled {
@@ -94,7 +166,7 @@ img {
 a.button {
 	display: inline-block;
 	padding: 0.6rem 1rem;
-	border-radius: 0.5rem;
+	border-radius: var(--radius);
 	background: var(--accent);
 	color: var(--accent-fg);
 	font-weight: 600;
@@ -103,14 +175,19 @@ a.button {
 
 button.secondary,
 a.button.secondary {
-	border: 1px solid var(--line);
+	border: 1px solid var(--edge);
 	background: var(--card);
 	color: var(--fg);
 }
 
+button.secondary:hover:not(:disabled),
+a.button.secondary:hover {
+	border-color: var(--muted);
+}
+
 button.danger {
-	background: #b3261e;
-	color: #ffffff;
+	background: var(--danger);
+	color: var(--bg);
 }
 
 /* A button that looks like a link. */
@@ -120,12 +197,13 @@ button.link {
 	color: var(--accent);
 	font-weight: normal;
 	text-decoration: underline;
+	text-underline-offset: 2px;
 }
 
 .error {
 	margin-top: 1rem;
 	padding: 0.75rem 1rem;
-	border-radius: 0.5rem;
+	border-radius: var(--radius);
 	background: var(--danger-bg);
 }
 

@@ -156,7 +156,7 @@
 	}
 
 	.count.over {
-		color: var(--accent);
+		color: var(--danger);
 	}
 
 	.flavours {
@@ -178,18 +178,18 @@
 	}
 
 	.chip {
-		padding: 0.2rem 0.7rem;
-		border: 1px solid var(--line);
+		padding: 0.25rem 0.75rem;
+		border: 1px solid var(--edge);
 		border-radius: 999px;
-		background: var(--bg);
+		background: var(--card);
 		color: var(--fg);
-		font-weight: normal;
+		font-weight: 500;
 	}
 
 	.chip.on {
 		border-color: var(--accent);
-		background: var(--accent);
-		color: var(--accent-fg);
+		background: var(--accent-soft);
+		color: var(--accent);
 	}
 
 	.pantry {

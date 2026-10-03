@@ -3,7 +3,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import sharp from 'sharp';
 
-const TERRACOTTA = '#b4442b';
+const ORANGE = '#c2410c';
 const CREAM = '#fbf3e6';
 const SPARK = '#ffc94d';
 
@@ -33,11 +33,11 @@ const drawing = `
     <rect x="360" y="312" width="64" height="24" rx="12"/>
     <path d="M140 286 H372 V370 Q372 414 328 414 H184 Q140 414 140 370 Z"/>
   </g>
-  <rect x="140" y="340" width="232" height="12" fill="${TERRACOTTA}" opacity="0.35"/>`;
+  <rect x="140" y="340" width="232" height="12" fill="${ORANGE}" opacity="0.35"/>`;
 
 function logo({ corner, scale }) {
 	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="${corner}" fill="${TERRACOTTA}"/>
+  <rect width="512" height="512" rx="${corner}" fill="${ORANGE}"/>
   <g transform="translate(256 256) scale(${scale}) translate(-256 -246)">${drawing}</g>
 </svg>
 `;
@@ -84,7 +84,7 @@ const courses = {
     <g fill="${SPARK}">
       <ellipse cx="256" cy="228" rx="104" ry="52"/>
     </g>
-    <g fill="${TERRACOTTA}" opacity="0.35">
+    <g fill="${ORANGE}" opacity="0.35">
       <ellipse cx="256" cy="228" rx="104" ry="52"/>
     </g>
     <g stroke="${CREAM}" stroke-width="18" stroke-linecap="round" fill="none">
@@ -148,7 +148,7 @@ const courses = {
       <path d="M146 296 Q146 172 256 172 Q366 172 366 296 Z"/>
       <circle cx="256" cy="146" r="22"/>
     </g>
-    <path d="M146 296 Q146 172 256 172 Q366 172 366 296 Z" fill="${TERRACOTTA}" opacity="0.18"/>`
+    <path d="M146 296 Q146 172 256 172 Q366 172 366 296 Z" fill="${ORANGE}" opacity="0.18"/>`
 };
 
 function courseArt(art) {

@@ -214,10 +214,12 @@
 					</div>
 					<span class="title">{recipe.title}</span>
 					<span class="meta">
-						{#if recipe.total_minutes !== null}<span>{formatMinutes(recipe.total_minutes)} ·</span>{/if}
-						<span>Complexity {recipe.complexity}/5</span>
+						{#if recipe.total_minutes !== null}<span class="time">{formatMinutes(recipe.total_minutes)}</span>{/if}
+						<span class="dots" role="img" aria-label="Complexity {recipe.complexity} of 5">
+							{#each [1, 2, 3, 4, 5] as level (level)}<i class:on={level <= recipe.complexity}></i>{/each}
+						</span>
 						{#if recipe.source_domain ?? recipe.origin !== 'imported'}
-							<span class="source">· {recipe.source_domain ?? (recipe.origin === 'created' ? 'Created' : 'Recipe book')}</span>
+							<span class="source">{recipe.source_domain ?? (recipe.origin === 'created' ? 'Created' : 'Recipe book')}</span>
 						{/if}
 					</span>
 				</a>
@@ -240,7 +242,7 @@
 	.search {
 		flex: 1;
 		min-width: 0;
-		font-size: 1.15rem;
+		font-size: 1.1rem;
 	}
 
 	.filters-toggle {
@@ -253,7 +255,6 @@
 	/* Filters stay visible as "applied" while the panel is shut. */
 	.filters-toggle.applied {
 		border-color: var(--accent);
-		color: var(--accent);
 	}
 
 	.badge {
@@ -282,10 +283,9 @@
 		align-items: flex-start;
 		gap: 0.75rem;
 		margin-top: 0.75rem;
-		padding: 0.75rem;
-		border: 1px solid var(--line);
-		border-radius: 0.75rem;
-		background: var(--card);
+		padding: 1rem;
+		border-radius: 12px;
+		background: var(--soft);
 	}
 
 	.panel[hidden] {
@@ -322,18 +322,18 @@
 	}
 
 	.chip {
-		padding: 0.2rem 0.7rem;
-		border: 1px solid var(--line);
+		padding: 0.25rem 0.75rem;
+		border: 1px solid var(--edge);
 		border-radius: 999px;
-		background: var(--bg);
+		background: var(--card);
 		color: var(--fg);
-		font-weight: normal;
+		font-weight: 500;
 	}
 
 	.chip.on {
 		border-color: var(--accent);
-		background: var(--accent);
-		color: var(--accent-fg);
+		background: var(--accent-soft);
+		color: var(--accent);
 	}
 
 	.count,
@@ -344,7 +344,7 @@
 	.grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-		gap: 1rem;
+		gap: 1.75rem 1.25rem;
 		padding: 0;
 		list-style: none;
 	}
@@ -361,10 +361,6 @@
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-		overflow: hidden;
-		border: 1px solid var(--line);
-		border-radius: 0.75rem;
-		background: var(--card);
 		color: var(--fg);
 		text-decoration: none;
 	}
@@ -374,13 +370,30 @@
 		width: 100%;
 		aspect-ratio: 4 / 3;
 		overflow: hidden;
-		background: var(--line);
+		border-radius: 10px;
+		background: var(--soft);
 	}
 
 	.picture :global(img) {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+		transition: transform 0.3s ease-out;
+	}
+
+	.card:hover .picture :global(img) {
+		transform: scale(1.03);
+	}
+
+	/* The drawing keeps its own size, centred, rather than being cropped like a photo. */
+	.picture :global(.art img) {
+		width: 40%;
+		height: auto;
+		object-fit: contain;
+	}
+
+	.card:hover .picture :global(.art img) {
+		transform: none;
 	}
 
 	/* The course illustration sits in the middle instead of filling the tile. */
@@ -390,18 +403,54 @@
 	}
 
 	.title {
-		padding: 0.6rem 0.75rem 0;
+		padding-top: 0.6rem;
+		font-family: var(--serif);
+		font-size: 1.12rem;
 		font-weight: 600;
+		line-height: 1.25;
+	}
+
+	.card:hover .title {
+		text-decoration: underline;
+		text-decoration-thickness: 1px;
+		text-underline-offset: 3px;
 	}
 
 	.meta {
-		padding: 0.25rem 0.75rem 0.75rem;
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		margin-top: auto;
+		padding-top: 0.35rem;
 		color: var(--muted);
 		font-size: 0.85rem;
 	}
 
-	/* Each part wraps whole, so "Complexity 2/5" never splits across lines. */
-	.meta span {
+	.time {
+		white-space: nowrap;
+	}
+
+	.dots {
+		display: inline-flex;
+		gap: 3px;
+	}
+
+	.dots i {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--edge);
+	}
+
+	.dots i.on {
+		background: var(--accent);
+	}
+
+	.source {
+		min-width: 0;
+		margin-left: auto;
+		overflow: hidden;
+		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
@@ -409,17 +458,15 @@
 	@media (max-width: 32rem) {
 		.grid {
 			grid-template-columns: repeat(2, minmax(0, 1fr));
-			gap: 0.6rem;
+			gap: 1.25rem 0.75rem;
 		}
 
 		.title {
-			padding: 0.5rem 0.6rem 0;
-			font-size: 0.95rem;
-			line-height: 1.3;
+			padding-top: 0.45rem;
+			font-size: 1rem;
 		}
 
 		.meta {
-			padding: 0.2rem 0.6rem 0.6rem;
 			font-size: 0.8rem;
 		}
 
