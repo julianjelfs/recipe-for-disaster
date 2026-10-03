@@ -4,28 +4,30 @@
 	import { page } from '$app/state';
 	import IngredientFilter from '$lib/IngredientFilter.svelte';
 	import RecipeImage from '$lib/RecipeImage.svelte';
-	import { ApiError, PAGE_SIZE, searchRecipes } from '$lib/api';
 	import { activeFilterCount } from '$lib/filters';
 	import { formatMinutes } from '$lib/format';
 	import type { Snapshot } from './$types';
 
 	let { data } = $props();
 
-	// Starts over from the first page whenever the search or filters change.
-	let recipes = $derived(data.page.recipes);
-	const total = $derived(data.page.total);
-	const more = $derived(recipes.length < total);
-	let loading = $state(false);
-	let loadError = $state('');
-	let nearEnd = $state(false);
+	// Every match is already here; the list shows them a screenful at a time so a long library
+	// doesn't build every card at once.
+	const SCREENFUL = 48;
 
-	/** Going back to the list reloads as many recipes as were showing and returns to the same spot. */
+	const total = $derived(data.results.total);
+	// Back to one screenful when the search or filters change, but not when a sync redraws the page.
+	let shown = $derived.by(() => {
+		void page.url.search;
+		return SCREENFUL;
+	});
+	const recipes = $derived(data.results.recipes.slice(0, shown));
+	const more = $derived(shown < total);
+
+	/** Going back to the list shows as many recipes as were showing and returns to the same spot. */
 	export const snapshot: Snapshot<{ count: number; y: number }> = {
-		capture: () => ({ count: recipes.length, y: window.scrollY }),
+		capture: () => ({ count: shown, y: window.scrollY }),
 		restore: async ({ count, y }) => {
-			while (recipes.length < Math.min(count, total) && !loadError) {
-				await loadMore(Math.min(count - recipes.length, 100));
-			}
+			shown = count;
 			await tick();
 			window.scrollTo(0, y);
 		}
@@ -71,34 +73,25 @@
 		update({ tag: next.join(',') || null });
 	}
 
-	async function loadMore(limit = PAGE_SIZE) {
-		if (loading || !more) return;
-		const forPage = data.page;
-		loading = true;
-		loadError = '';
-		try {
-			const next = await searchRecipes(params, { offset: recipes.length, limit });
-			// A change of search or filter while this was in flight has already replaced the list.
-			if (data.page === forPage) recipes = [...recipes, ...next.recipes];
-		} catch (error) {
-			if (data.page === forPage) loadError = error instanceof ApiError ? error.message : 'Could not load more recipes.';
-		} finally {
-			loading = false;
-		}
+	function showMore() {
+		shown += SCREENFUL;
 	}
 
-	// Keeps loading while the end of the list is close, but won't retry on its own after an error.
-	$effect(() => {
-		if (nearEnd && more && !loading && !loadError) loadMore();
-	});
-
+	// Adds a screenful whenever the end of the list comes close.
 	function watchEnd(node: HTMLElement) {
-		const observer = new IntersectionObserver(([entry]) => (nearEnd = entry.isIntersecting), { rootMargin: '800px 0px' });
+		const observer = new IntersectionObserver(
+			async ([entry]) => {
+				if (!entry.isIntersecting) return;
+				showMore();
+				await tick();
+				// Observing afresh reports again, so a screen tall enough to still show the end gets another.
+				observer.unobserve(node);
+				observer.observe(node);
+			},
+			{ rootMargin: '800px 0px' }
+		);
 		observer.observe(node);
-		return () => {
-			observer.disconnect();
-			nearEnd = false;
-		};
+		return () => observer.disconnect();
 	}
 
 	function clearFilters() {
@@ -233,10 +226,7 @@
 	</ul>
 	{#if more}
 		<div class="more" {@attach watchEnd}>
-			{#if loadError}<p class="empty">{loadError}</p>{/if}
-			<button class="secondary" onclick={() => loadMore()} disabled={loading}>
-				{loading ? 'Loading…' : loadError ? 'Try again' : 'Show more'}
-			</button>
+			<button class="secondary" onclick={showMore}>Show more</button>
 		</div>
 	{/if}
 {/if}

@@ -12,7 +12,6 @@ UK_UNITS: tuple[str, ...] = get_args(Unit)
 
 Course = Literal["breakfast", "starter", "main", "side", "dessert", "baking", "snack", "drink", "sauce"]
 Diet = Literal["vegetarian", "vegan", "gluten-free", "dairy-free", "nut-free"]
-SearchSort = Literal["relevance", "newest", "title", "quickest", "simplest"]
 # Imported from a URL, or invented by Claude from a brief.
 Origin = Literal["imported", "created"]
 
@@ -119,48 +118,17 @@ class Recipe(BaseModel):
     steps: list[Step]
 
 
-class RecipeSummary(BaseModel):
-    id: int
-    title: str
-    image_url: str | None
-    source_domain: str | None
-    origin: Origin
-    total_minutes: int | None
-    complexity: int
-    cuisine: str | None
-    course: str | None
-    diet: list[str]
-    created_at: str
+class SyncResponse(BaseModel):
+    """What changed in the library since a device last synced. See app.sync."""
 
-
-class RecipePage(BaseModel):
-    """One page of search results, and how many recipes match in all."""
-
-    recipes: list[RecipeSummary]
-    total: int
-
-
-class FacetValue(BaseModel):
-    value: str
-    count: int
-
-
-class Facets(BaseModel):
-    total: int
-    ingredients: list[FacetValue]
-    cuisines: list[FacetValue]
-    courses: list[FacetValue]
-    diet: list[FacetValue]
-    equipment: list[FacetValue]
-    techniques: list[FacetValue]
-    tags: list[FacetValue]
-
-
-class OfflineCopy(BaseModel):
-    """Everything a phone needs to browse the library away from the home network."""
-
-    recipes: list[Recipe]
-    facets: Facets
+    # Changes whenever a migration runs. A device holding another epoch's copy starts again.
+    epoch: int
+    # The revision this response brings the device up to. It asks for changes since this next time.
+    revision: int
+    # True when `changed` is the whole library and the device should drop everything else it holds.
+    full: bool
+    changed: list[Recipe]
+    deleted: list[int]
 
 
 class ImportRequest(BaseModel):

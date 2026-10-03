@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatAmount, formatCount, formatTimer } from './format';
+import { formatAgo, formatAmount, formatCount, formatTimer } from './format';
 
 function ingredient(quantity: number | null, unit: string | null, name: string, quantity_max: number | null = null) {
 	return { quantity, quantity_max, unit, name };
@@ -48,5 +48,19 @@ describe('formatTimer', () => {
 		expect(formatTimer(1200)).toBe('20 min');
 		expect(formatTimer(4500)).toBe('1 hr 15 min');
 		expect(formatTimer(90)).toBe('90 sec');
+	});
+});
+
+describe('formatAgo', () => {
+	const now = new Date('2026-10-03T12:00:00Z');
+	it.each([
+		['2026-10-03T11:59:45Z', 'just now'],
+		['2026-10-03T11:59:00Z', '1 minute ago'],
+		['2026-10-03T11:20:00Z', '40 minutes ago'],
+		['2026-10-03T09:00:00Z', '3 hours ago'],
+		['2026-10-02T10:00:00Z', 'yesterday'],
+		['2026-09-28T12:00:00Z', '5 days ago']
+	])('%s is %s', (when, expected) => {
+		expect(formatAgo(when, now)).toBe(expected);
 	});
 });

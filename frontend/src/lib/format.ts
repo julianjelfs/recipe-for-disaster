@@ -75,3 +75,14 @@ export function formatMinutes(minutes: number | null): string | null {
 export function formatTimer(seconds: number): string {
 	return seconds % 60 === 0 ? (formatMinutes(seconds / 60) ?? '') : `${seconds} sec`;
 }
+
+/** "5 minutes ago", "yesterday", "3 days ago". */
+export function formatAgo(when: string, now: Date = new Date()): string {
+	const minutes = Math.max(0, Math.round((now.getTime() - new Date(when).getTime()) / 60_000));
+	if (minutes < 1) return 'just now';
+	if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+	const hours = Math.round(minutes / 60);
+	if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+	const days = Math.round(hours / 24);
+	return days === 1 ? 'yesterday' : `${days} days ago`;
+}

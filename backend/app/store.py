@@ -11,21 +11,6 @@ from app.schemas import Ingredient, NormalisedRecipe, Recipe, Step
 # NormalisedRecipe list field -> tags.kind. Tags of kind 'custom' are the ones people add.
 TAG_FIELDS = {"diet": "diet", "equipment": "equipment", "techniques": "technique"}
 
-# One recipe's search index row. migrations/003_search.sql builds the same columns.
-_INDEX_ROW = """
-    SELECT
-        r.id,
-        r.title,
-        coalesce((SELECT group_concat(i.name || ' ' || i.canonical_name, ' ') FROM ingredients i WHERE i.recipe_id = r.id), ''),
-        coalesce((SELECT group_concat(s.text, ' ') FROM steps s WHERE s.recipe_id = r.id), ''),
-        coalesce((SELECT group_concat(t.value, ' ') FROM tags t WHERE t.recipe_id = r.id), ''),
-        r.notes,
-        coalesce(r.cuisine, '') || ' ' || coalesce(r.course, '')
-    FROM recipes r
-    WHERE r.id = ?
-"""
-
-
 def find_recipe_id(conn: sqlite3.Connection, source_url: str) -> int | None:
     row = conn.execute("SELECT id FROM recipes WHERE source_url = ?", (source_url,)).fetchone()
     return row["id"] if row else None
@@ -82,7 +67,6 @@ def insert_recipe(
         )
         recipe_id = cursor.lastrowid
         _insert_content(conn, recipe_id, recipe)
-        _reindex(conn, recipe_id)
     return recipe_id
 
 
@@ -128,13 +112,11 @@ def replace_recipe(
             conn.execute("DELETE FROM tags WHERE recipe_id = ?", (recipe_id,))
             _insert_tags(conn, recipe_id, [("custom", tag) for tag in custom_tags])
         _insert_content(conn, recipe_id, recipe)
-        _reindex(conn, recipe_id)
     return True
 
 
 def delete_recipe(conn: sqlite3.Connection, recipe_id: int) -> bool:
     with conn:
-        conn.execute("DELETE FROM recipe_search WHERE recipe_id = ?", (recipe_id,))
         return conn.execute("DELETE FROM recipes WHERE id = ?", (recipe_id,)).rowcount == 1
 
 
@@ -178,14 +160,6 @@ def _insert_tags(conn: sqlite3.Connection, recipe_id: int, tags: Iterable[tuple[
     conn.executemany(
         "INSERT INTO tags (recipe_id, kind, value) VALUES (?, ?, ?)",
         [(recipe_id, kind, value) for kind, value in cleaned],
-    )
-
-
-def _reindex(conn: sqlite3.Connection, recipe_id: int) -> None:
-    conn.execute("DELETE FROM recipe_search WHERE recipe_id = ?", (recipe_id,))
-    conn.execute(
-        f"INSERT INTO recipe_search (recipe_id, title, ingredients, steps, tags, notes, meta) {_INDEX_ROW}",
-        (recipe_id,),
     )
 
 

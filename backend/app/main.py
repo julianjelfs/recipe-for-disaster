@@ -1,6 +1,5 @@
 """FastAPI app. JSON API under /api, and the built frontend everywhere else."""
 
-import hashlib
 import os
 import sqlite3
 from collections.abc import Callable, Iterator
@@ -8,9 +7,9 @@ from contextlib import asynccontextmanager, contextmanager
 from functools import lru_cache
 
 import anthropic
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 
-from app import config, db, reports, search, store
+from app import config, db, reports, store, sync
 from app.importer.extract import ExtractError
 from app.importer.fetch import FetchError, InvalidUrl, fetch_html
 from app.importer.normalise import NormaliseError
@@ -18,23 +17,17 @@ from app.importer.pipeline import create_recipe, import_url, renormalise_recipe
 from app.importer.validate import ValidationFailed, validate
 from app.schemas import (
     CreateRequest,
-    Facets,
     FlagCreated,
     FlagRequest,
     ImportRequest,
-    OfflineCopy,
     Recipe,
     RecipeEdit,
-    RecipePage,
-    SearchSort,
+    SyncResponse,
 )
 from app.ui import UiFiles
 
 # Long enough for a detailed brief, short enough that nobody pastes an essay into a Claude call.
 MAX_BRIEF = 500
-# The home page loads recipes a page at a time as you scroll.
-PAGE_SIZE = 48
-MAX_PAGE_SIZE = 100
 
 
 @asynccontextmanager
@@ -94,10 +87,6 @@ def importer_errors() -> Iterator[None]:
         raise api_error(502, f"Claude API error: {error}") from error
 
 
-def _split(values: str) -> list[str]:
-    return [value.strip() for value in values.split(",") if value.strip()]
-
-
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -133,71 +122,14 @@ def create_from_brief(
         return create_recipe(conn, brief, client)
 
 
-@app.get("/api/recipes", response_model=RecipePage)
-def list_recipes(
-    q: str | None = None,
-    has: str = "",
-    max_total: int | None = None,
-    max_complexity: int | None = None,
-    cuisine: str | None = None,
-    course: str | None = None,
-    tag: str = "",
-    sort: SearchSort | None = None,
-    limit: int = Query(PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
-    offset: int = Query(0, ge=0),
+@app.get("/api/sync", response_model=SyncResponse)
+def sync_library(
+    since: int = Query(0, ge=0),
+    epoch: int | None = None,
     conn: sqlite3.Connection = Depends(get_conn),
-) -> RecipePage:
-    """`has` and `tag` take comma-separated lists; a recipe must match every entry."""
-    return search.search_recipes(
-        conn,
-        q=q,
-        has=_split(has),
-        max_total=max_total,
-        max_complexity=max_complexity,
-        cuisine=cuisine,
-        course=course,
-        tags=_split(tag),
-        sort=sort,
-        limit=limit,
-        offset=offset,
-    )
-
-
-@app.get("/api/facets", response_model=Facets)
-def read_facets(conn: sqlite3.Connection = Depends(get_conn)) -> Facets:
-    return search.facets(conn)
-
-
-@app.get("/api/offline", response_model=OfflineCopy)
-def offline_copy(request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> Response:
-    """Every recipe in full, plus the facets. The service worker saves this so the app can be
-    browsed, searched and cooked from when the Pi is out of reach.
-
-    Phones check it on every visit, so it carries an ETag: an unchanged library costs a 304, not
-    the whole copy again."""
-    ids = [row[0] for row in conn.execute("SELECT id FROM recipes ORDER BY id")]
-    body = OfflineCopy(
-        recipes=[store.get_recipe(conn, recipe_id) for recipe_id in ids],
-        facets=search.facets(conn),
-    ).model_dump_json().encode()
-    etag = f'"{hashlib.sha256(body).hexdigest()[:32]}"'
-    headers = {"ETag": etag, "Cache-Control": "no-cache"}
-    if _etag_matches(request.headers.get("if-none-match", ""), etag):
-        return Response(status_code=304, headers=headers)
-    return Response(body, media_type="application/json", headers=headers)
-
-
-def _etag_matches(header: str, etag: str) -> bool:
-    """Caddy's encode marks the ETag of a compressed response ("abc" becomes "abc-zstd", or a weak
-    W/"abc"), and the phone sends that back. Compare the hash underneath."""
-
-    def bare(tag: str) -> str:
-        tag = tag.strip().removeprefix("W/").strip('"')
-        for suffix in ("-zstd", "-gzip", "-br"):
-            tag = tag.removesuffix(suffix)
-        return tag
-
-    return any(bare(tag) == bare(etag) for tag in header.split(",") if tag.strip())
+) -> SyncResponse:
+    """What changed since revision `since`. With since=0 (a new device) it is the whole library."""
+    return sync.changes_since(conn, since, epoch)
 
 
 @app.get("/api/recipes/{recipe_id}", response_model=Recipe)

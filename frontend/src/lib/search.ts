@@ -1,29 +1,17 @@
-// Types only: the service worker imports this file, and must not pull in api.ts and SvelteKit with it.
-import type { Facets, Recipe, RecipePage, RecipeSummary } from './api';
-
-// The API's default page size, used when a request doesn't say.
-const DEFAULT_LIMIT = 48;
+import type { FacetValue, Facets, Recipe, RecipeSummary } from './api';
 
 /**
- * The saved copy of the library that lets the app work away from the home network, where the Pi
- * can't be reached. The service worker keeps it fresh and answers the app's API calls from it.
- * Shape matches GET /api/offline.
+ * Search, filters and facets over the library copy each device keeps (see library.svelte.ts).
+ * There is no server-side search: this is the only implementation, online or off.
  */
-export interface OfflineCopy {
-	recipes: Recipe[];
-	facets: Facets;
+
+export interface SearchResult {
+	/** Every match, in order. The home page shows them a screenful at a time. */
+	recipes: RecipeSummary[];
+	total: number;
 }
 
-/** Where the service worker keeps the copy. */
-export const OFFLINE_CACHE = 'offline-copy';
-export const OFFLINE_KEY = '/api/offline';
-/**
- * When the Pi last confirmed the copy was current, as {checked_at}. Kept apart from the copy because
- * an unchanged library answers 304, and rewriting the whole copy to restamp it would waste the saving.
- */
-export const CHECKED_KEY = '/api/offline/checked';
-
-/** Rough English singular. Same rules as app.search.singular, so ingredient filters match the same way. */
+/** Rough English singular, enough to match "leeks" to "leek" and "tomatoes" to "tomato". */
 export function singular(word: string): string {
 	if (word.length > 3 && word.endsWith('ies')) return word.slice(0, -3) + 'y';
 	if (word.length > 3 && word.endsWith('oes')) return word.slice(0, -2);
@@ -41,8 +29,20 @@ function words(text: string): string[] {
 	);
 }
 
-// The columns of the server's full-text index, with its bm25 weights.
+// What text search looks at, and how much a hit in each counts (bm25 column weights). Worked out
+// once per recipe object: a sync replaces the object when the recipe changes.
+const columnCache = new WeakMap<Recipe, [number, string[]][]>();
+
 function columns(recipe: Recipe): [number, string[]][] {
+	let cached = columnCache.get(recipe);
+	if (!cached) {
+		cached = readColumns(recipe);
+		columnCache.set(recipe, cached);
+	}
+	return cached;
+}
+
+function readColumns(recipe: Recipe): [number, string[]][] {
 	return [
 		[10, words(recipe.title)],
 		[5, words(recipe.ingredients.map((i) => `${i.name} ${i.canonical_name}`).join(' '))],
@@ -54,7 +54,7 @@ function columns(recipe: Recipe): [number, string[]][] {
 }
 
 /**
- * A light stand-in for the server's Porter stemmer, enough that "baking", "baked" and "bake" meet,
+ * A light stemmer, a stand-in for SQLite's Porter one, enough that "baking", "baked" and "bake" meet,
  * as do "roasting" and "roast", and "chopped" and "chop". Only for text search; ingredient filters use singular().
  */
 function stem(word: string): string {
@@ -69,9 +69,9 @@ const K1 = 1.2;
 const B = 0.75;
 
 /**
- * Text search scores for the recipes that match, higher first: FTS5's bm25, worked out over the
- * whole saved library as the server works it out over its index. Every word must match the start
- * of a word somewhere, as on the server, with common endings forgiven as its stemmer forgives them.
+ * Text search scores for the recipes that match, higher first: bm25 as SQLite's FTS5 computes it,
+ * over the whole library. Every word must match the start of a word somewhere, with common endings
+ * forgiven by stem().
  */
 function textScores(recipes: Recipe[], query: string[]): Map<number, number> {
 	const docs = recipes.map((recipe) => {
@@ -140,8 +140,11 @@ export function summarise(recipe: Recipe): RecipeSummary {
 	return { id, title, image_url, source_domain, origin, total_minutes, complexity, cuisine, course, diet, created_at };
 }
 
-/** GET /api/recipes, answered from the saved copy. Takes the same query parameters. */
-export function searchOffline(recipes: Recipe[], params: URLSearchParams): RecipePage {
+/**
+ * The recipes matching the home page's URL parameters: q (text), has (ingredients, comma-separated),
+ * tag, max_total, max_complexity, cuisine, course and sort.
+ */
+export function search(recipes: Recipe[], params: URLSearchParams): SearchResult {
 	const query = words(params.get('q') ?? '');
 	const has = list(params.get('has'));
 	const tags = list(params.get('tag')).map((t) => t.toLowerCase());
@@ -154,7 +157,7 @@ export function searchOffline(recipes: Recipe[], params: URLSearchParams): Recip
 	const matches = recipes.filter((recipe) => {
 		if (query.length && !scores.has(recipe.id)) return false;
 		if (!has.every((name) => hasIngredient(recipe, name))) return false;
-		// As in SQL, a recipe with no total time never passes a time limit.
+		// A recipe with no total time never passes a time limit: nobody knows it's quick.
 		if (maxTotal !== null && (recipe.total_minutes === null || recipe.total_minutes > maxTotal)) return false;
 		if (maxComplexity !== null && recipe.complexity > maxComplexity) return false;
 		if (cuisine && recipe.cuisine?.toLowerCase() !== cuisine) return false;
@@ -169,19 +172,54 @@ export function searchOffline(recipes: Recipe[], params: URLSearchParams): Recip
 			? (a: Recipe, b: Recipe) => (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0) || a.id - b.id
 			: (ORDER[sort] ?? ORDER.newest);
 	matches.sort(order);
-
-	const offset = number(params.get('offset')) ?? 0;
-	const limit = number(params.get('limit')) ?? DEFAULT_LIMIT;
-	return { recipes: matches.slice(offset, offset + limit).map(summarise), total: matches.length };
+	return { recipes: matches.map(summarise), total: matches.length };
 }
 
-/** "5 minutes ago", "yesterday", "3 days ago": when the saved copy was last known to be current. */
-export function savedAgo(savedAt: string, now: Date = new Date()): string {
-	const minutes = Math.max(0, Math.round((now.getTime() - new Date(savedAt).getTime()) / 60_000));
-	if (minutes < 1) return 'just now';
-	if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
-	const hours = Math.round(minutes / 60);
-	if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
-	const days = Math.round(hours / 24);
-	return days === 1 ? 'yesterday' : `${days} days ago`;
+
+function counted(counts: Map<string, number>): FacetValue[] {
+	return [...counts]
+		.map(([value, count]) => ({ value, count }))
+		.sort((a, b) => b.count - a.count || (a.value < b.value ? -1 : a.value > b.value ? 1 : 0));
+}
+
+function bump(counts: Map<string, number>, value: string) {
+	counts.set(value, (counts.get(value) ?? 0) + 1);
+}
+
+/** What the library holds, for the filter panel: each value with the number of recipes that have it. */
+export function facets(recipes: Recipe[]): Facets {
+	const ingredients = new Map<string, number>();
+	const courses = new Map<string, number>();
+	const diet = new Map<string, number>();
+	const equipment = new Map<string, number>();
+	const techniques = new Map<string, number>();
+	const tags = new Map<string, number>();
+	// Cuisines count together whatever their case, under the spelling seen first.
+	const cuisines = new Map<string, number>();
+	const cuisineSpelling = new Map<string, string>();
+
+	for (const recipe of [...recipes].sort((a, b) => a.id - b.id)) {
+		for (const name of new Set(recipe.ingredients.map((i) => i.canonical_name))) bump(ingredients, name);
+		if (recipe.course) bump(courses, recipe.course);
+		if (recipe.cuisine) {
+			const key = recipe.cuisine.toLowerCase();
+			if (!cuisineSpelling.has(key)) cuisineSpelling.set(key, recipe.cuisine);
+			bump(cuisines, cuisineSpelling.get(key)!);
+		}
+		for (const value of new Set(recipe.diet)) bump(diet, value);
+		for (const value of new Set(recipe.equipment)) bump(equipment, value);
+		for (const value of new Set(recipe.techniques)) bump(techniques, value);
+		for (const value of new Set(recipe.tags)) bump(tags, value);
+	}
+
+	return {
+		total: recipes.length,
+		ingredients: counted(ingredients),
+		cuisines: counted(cuisines),
+		courses: counted(courses),
+		diet: counted(diet),
+		equipment: counted(equipment),
+		techniques: counted(techniques),
+		tags: counted(tags)
+	};
 }

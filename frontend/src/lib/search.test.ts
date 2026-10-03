@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Recipe } from './api';
-import { savedAgo, searchOffline, summarise } from './offline';
+import { facets, search, summarise } from './search';
 
-// The same three recipes as library() in backend/tests/test_library.py, so the offline search can be
-// held to the same expectations as the server's.
+// Three recipes with a little overlap: two with leeks, two with bacon, one vegetarian.
 let nextId = 1;
 type Overrides = Partial<Omit<Recipe, 'ingredients' | 'steps'>> & { ingredients: [string, string][]; steps: string[] };
 
@@ -89,17 +88,17 @@ const thighs = recipe({ title: 'Roast thighs', ingredients: [['boneless chicken 
 const library = [pie, soup, sandwich];
 
 function ids(recipes: Recipe[], params: Record<string, string> = {}): number[] {
-	return searchOffline(recipes, new URLSearchParams(params)).recipes.map((r) => r.id);
+	return search(recipes, new URLSearchParams(params)).recipes.map((r) => r.id);
 }
 
-describe('searchOffline', () => {
-	it('needs every listed ingredient', () => {
+describe('search', () => {
+	it('invariant 7: needs an ingredient matching every one listed', () => {
 		expect(ids(library, { has: 'leek,bacon' })).toEqual([pie.id]);
 		expect(ids(library, { has: 'leek' }).sort()).toEqual([pie.id, soup.id]);
 		expect(ids(library, { has: 'leek,bacon,potato' })).toEqual([]);
 	});
 
-	it('matches ingredients singular or plural, and only as whole words', () => {
+	it('invariant 7: matches ingredients singular or plural, and only as whole words', () => {
 		const all = [...library, thighs];
 		expect(ids(all, { has: 'Leeks' }).sort()).toEqual([pie.id, soup.id]);
 		expect(ids(all, { has: 'potatoes' })).toEqual([soup.id]);
@@ -116,7 +115,7 @@ describe('searchOffline', () => {
 		expect(ids(library, { q: 'lasagne' })).toEqual([]);
 	});
 
-	it('forgives word endings as the server stemmer does', () => {
+	it('forgives word endings, as a stemmer would', () => {
 		const bread = recipe({ title: 'Baked bread', ingredients: [['flour', 'flour']], steps: ['Chop nothing. Roast nothing.'] });
 		expect(ids([bread], { q: 'baking' })).toEqual([bread.id]);
 		expect(ids([bread], { q: 'chopped' })).toEqual([bread.id]);
@@ -131,7 +130,7 @@ describe('searchOffline', () => {
 		expect(ids([toast, toastie], { q: 'grill' })).toEqual([toastie.id, toast.id]);
 	});
 
-	it('filters and sorts as the server does', () => {
+	it('filters and sorts', () => {
 		expect(ids(library, { max_total: '60' })).toEqual([soup.id]);
 		expect(ids(library, { max_complexity: '1' }).sort()).toEqual([soup.id, sandwich.id]);
 		expect(ids(library, { course: 'breakfast' })).toEqual([sandwich.id]);
@@ -143,31 +142,63 @@ describe('searchOffline', () => {
 		expect(ids(library, { sort: 'simplest' })).toEqual([soup.id, sandwich.id, pie.id]);
 	});
 
-	it('pages through every match once, with total counting them all', () => {
-		const whole = ids(library);
-		const paged = [0, 1, 2, 3].flatMap((offset) => ids(library, { offset: String(offset), limit: '1' }));
-		expect(paged).toEqual(whole);
-		expect(searchOffline(library, new URLSearchParams({ limit: '1', offset: '1' })).total).toBe(3);
+	// Recipes that tie on time, complexity and title, so only the tiebreak orders them.
+	const shelf = Array.from({ length: 11 }, (_, n) =>
+		recipe({
+			title: n % 2 ? 'Stew' : `Stew ${n % 3}`,
+			total_minutes: n % 3 ? 30 : null,
+			complexity: 2,
+			ingredients: [['onion', 'onion']],
+			steps: ['Simmer the stew.']
+		})
+	);
+
+	it.each(['', 'newest', 'title', 'quickest', 'simplest', 'relevance'])(
+		'invariant 25: sort "%s" puts the same library in the same order, however it arrives',
+		(sort) => {
+			const params: Record<string, string> = sort ? { q: 'stew', sort } : { q: 'stew' };
+			const reversed = [...shelf].reverse();
+			const shuffled = [...shelf.filter((_, i) => i % 2), ...shelf.filter((_, i) => !(i % 2))];
+			expect(ids(reversed, params)).toEqual(ids(shelf, params));
+			expect(ids(shuffled, params)).toEqual(ids(shelf, params));
+			expect(new Set(ids(shelf, params)).size).toBe(11);
+		}
+	);
+
+	it('invariant 26: total counts every recipe matching the search and filters', () => {
+		const everything = [...library, ...shelf];
+		expect(search(everything, new URLSearchParams()).total).toBe(14);
+		expect(search(everything, new URLSearchParams({ has: 'leek' })).total).toBe(2);
+		const stews = search(everything, new URLSearchParams({ q: 'stew' }));
+		expect(stews.total).toBe(11);
+		expect(stews.recipes).toHaveLength(11);
 	});
 
-	it('returns summaries shaped like the server list', () => {
-		expect(searchOffline([soup], new URLSearchParams()).recipes).toEqual([summarise(soup)]);
+	it('returns summaries shaped like the list the home page shows', () => {
+		expect(search([soup], new URLSearchParams()).recipes).toEqual([summarise(soup)]);
 		expect(Object.keys(summarise(soup)).sort()).toEqual(
 			['complexity', 'course', 'created_at', 'cuisine', 'diet', 'id', 'image_url', 'origin', 'source_domain', 'title', 'total_minutes'].sort()
 		);
 	});
 });
 
-describe('savedAgo', () => {
-	const now = new Date('2026-10-03T12:00:00Z');
-	it.each([
-		['2026-10-03T11:59:45Z', 'just now'],
-		['2026-10-03T11:59:00Z', '1 minute ago'],
-		['2026-10-03T11:20:00Z', '40 minutes ago'],
-		['2026-10-03T09:00:00Z', '3 hours ago'],
-		['2026-10-02T10:00:00Z', 'yesterday'],
-		['2026-09-28T12:00:00Z', '5 days ago']
-	])('%s is %s', (savedAt, expected) => {
-		expect(savedAgo(savedAt, now)).toBe(expected);
+describe('facets', () => {
+	it('counts recipes, not mentions', () => {
+		const twice = recipe({ title: 'Leek gratin', ingredients: [['leeks', 'leek'], ['more leeks', 'leek']], steps: ['Bake.'] });
+		const result = facets([...library, twice]);
+		expect(result.total).toBe(4);
+		expect(result.ingredients).toEqual([
+			{ value: 'leek', count: 3 },
+			{ value: 'bacon', count: 2 },
+			{ value: 'bread', count: 1 },
+			{ value: 'potato', count: 1 }
+		]);
+		expect(result.courses.map((c) => c.value).sort()).toEqual(['breakfast', 'main', 'starter']);
+		expect(result.diet).toEqual([{ value: 'vegetarian', count: 1 }]);
+	});
+
+	it('counts a cuisine together whatever its case, under the spelling seen first', () => {
+		const french = recipe({ title: 'Gratin', cuisine: 'french', ingredients: [['potato', 'potato']], steps: ['Bake.'] });
+		expect(facets([soup, french]).cuisines).toEqual([{ value: 'French', count: 2 }]);
 	});
 });

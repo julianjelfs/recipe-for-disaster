@@ -54,14 +54,14 @@ def test_inv21_every_recipe_is_imported_or_created(conn):
 
 
 def test_inv22_created_recipe_is_stored_like_an_imported_one(conn):
-    """Invariant 22: creation writes the same tables, the same content and one search index row."""
+    """Invariant 22: creation writes the same tables and the same content as an import."""
     imported = add_recipe(conn, BBC_URL)
     created = create_recipe(conn, BRIEF, FakeClient(make_recipe()))
 
     def content(recipe_id: int) -> dict:
         return {
             table: conn.execute(f"SELECT count(*) FROM {table} WHERE recipe_id = ?", (recipe_id,)).fetchone()[0]
-            for table in ("ingredients", "steps", "tags", "recipe_search")
+            for table in ("ingredients", "steps", "tags")
         }
 
     assert content(created.id) == content(imported.id)
@@ -72,14 +72,10 @@ def test_inv22_created_recipe_is_stored_like_an_imported_one(conn):
     assert [(s.text, s.timer_seconds) for s in created.steps] == [(s.text, s.timer_seconds) for s in imported.steps]
 
 
-def test_created_recipes_are_searchable_and_deletable(conn):
+def test_created_recipes_are_deletable(conn):
     created = create_recipe(conn, BRIEF, FakeClient(make_recipe(title="Squash stew")))
-    from app import search
-
-    assert [r.id for r in search.search_recipes(conn, q="squash").recipes] == [created.id]
-    assert [r.origin for r in search.search_recipes(conn).recipes] == ["created"]
     assert store.delete_recipe(conn, created.id)
-    assert conn.execute("SELECT count(*) FROM recipe_search").fetchone()[0] == 0
+    assert store.get_recipe(conn, created.id) is None
 
 
 def test_created_recipes_can_be_flagged(conn):

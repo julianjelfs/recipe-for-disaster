@@ -73,14 +73,14 @@ To work through a report: `show` it to see what went wrong, change the prompt or
 | 4 | Every `step_ingredients` row references an ingredient belonging to the same recipe. | `test_import.py::test_inv4_step_ingredients_belong_to_same_recipe` |
 | 5 | Renormalise from stored raw data produces a recipe without any network fetch of the source URL. | `test_library.py::test_inv5_renormalise_uses_saved_page_data_without_fetching` |
 | 6 | A validation failure after one retry returns 422 and writes no recipe data. | `test_import.py::test_inv6_validation_failure_is_retried_with_errors`, `test_inv6_second_validation_failure_writes_nothing`, `test_inv6_api_returns_422_and_writes_nothing` |
-| 7 | `has=a,b` returns only recipes with an ingredient whose canonical name contains a (singular or plural) and one that contains b. | `test_library.py::test_inv7_has_requires_every_ingredient`, `test_inv7_has_matches_plurals_and_whole_words` |
+| 7 | `has=a,b` returns only recipes with an ingredient whose canonical name contains a (singular or plural) and one that contains b. | `frontend/src/lib/search.test.ts` "invariant 7: …" (two tests) |
 | 8 | Scaling servings by factor k multiplies every non-null quantity by k and leaves null quantities null. | `frontend/src/lib/scale.test.ts` "invariant 8: multiplies every non-null quantity by k and leaves null quantities null" |
 | 9 | Cooking mode "next" on the last step does not advance past it; "back" on the first does not go below it. | `frontend/src/lib/cook.test.ts` "invariant 9: …" (three tests) |
 | 10 | No temperature in stored step text is in °F. | `test_validate.py::test_inv10_fahrenheit_is_converted`, `test_inv10_validate_removes_fahrenheit_from_steps` |
 | 11 | No stored step text mentions cups, ounces or pounds. | `test_validate.py::test_inv11_steps_have_no_us_measures`, `test_inv11_words_containing_measures_are_allowed` |
 | 12 | A flag keeps the recipe as it was when flagged, even after the recipe is edited or deleted. | `test_reports.py::test_inv12_flag_keeps_recipe_as_it_was` |
 | 13 | An import that fails after its URL is accepted is recorded with the URL, the error and any extracted data. | `test_reports.py::test_inv13_validation_failure_is_recorded`, `test_inv13_fetch_failure_is_recorded` |
-| 14 | Each recipe has exactly one search index row matching its current content, and a deleted recipe has none. | `test_library.py::test_inv14_search_index_follows_every_change` |
+| 14 | Retired: there is no search index since search moved to the browser. Invariant 28 covers what it protected. | |
 | 15 | No ingredient whose name gives a size in cm or mm is stored with that size as its weight or volume. | `test_validate.py::test_inv15_size_in_name_is_not_stored_as_a_weight` |
 | 16 | Any non-API path that isn't a file returns the app's index.html; paths under /api never do. | `test_ui.py::test_inv16_client_routes_get_the_app`, `test_inv16_api_paths_never_get_the_app` |
 | 17 | A link shared to the app reaches /add as ?url= or inside ?text=, and the add page finds it in either. | `frontend/src/lib/share.test.ts` "invariant 17: …" (two tests) |
@@ -91,9 +91,13 @@ To work through a report: `show` it to see what went wrong, change the prompt or
 | 22 | A created recipe is stored exactly like an imported one, and "try again" reuses its brief without fetching anything. | `test_create.py::test_inv22_created_recipe_is_stored_like_an_imported_one`, `test_inv22_try_again_reinvents_from_the_saved_brief` |
 | 23 | Migrating a database that already holds recipes preserves their ingredients, steps and tags. | `test_migrations.py::test_inv23_migrating_keeps_existing_recipe_content` |
 | 24 | Every recipe without a photo gets an illustration, and every course has one. | `frontend/src/lib/course-art.test.ts` "invariant 24: …" (two tests) |
-| 25 | Reading the recipe list page by page returns every match exactly once, in the same order as the whole list, for every sort. | `test_library.py::test_inv25_pages_together_return_every_match_once_in_order`, `test_inv25_every_order_breaks_ties_by_id` |
-| 26 | A page's `total` is the number of recipes matching the search and filters, whatever the page size or offset. | `test_library.py::test_inv26_total_counts_every_match_whatever_the_page` |
-| 27 | The list API returns 48 recipes when no page size is given and refuses more than 100 in one request. | `test_library.py::test_inv27_api_pages_are_bounded` |
+| 25 | Every sort puts the same library in the same order, whatever order its recipes arrive in, so showing it a screenful at a time never repeats or skips one. | `frontend/src/lib/search.test.ts` "invariant 25: …" (one per sort) |
+| 26 | The total shown is the number of recipes matching the search and filters, not the number on screen. | `frontend/src/lib/search.test.ts` "invariant 26: …" |
+| 27 | Retired: there is no list API since search moved to the browser. | |
+| 28 | Syncing from revision r returns every recipe added or changed after r, including a change made only to its ingredients, steps or tags, and no other recipe. | `test_sync.py::test_inv28_every_write_path_is_reported_as_changed`, `test_inv28_a_change_to_a_recipes_parts_changes_the_recipe` |
+| 29 | Syncing from revision r reports every recipe deleted after r, and never reports as deleted a recipe that exists. | `test_sync.py::test_inv29_deleted_recipes_are_reported`, `test_inv29_a_reused_id_is_not_reported_deleted` |
+| 30 | A sync from revision 0, from another epoch, or from a revision ahead of the server returns the whole library, marked full. | `test_sync.py::test_inv30_a_fresh_device_gets_the_whole_library`, `test_inv30_a_copy_ahead_of_the_server_starts_again`, `test_inv30_a_copy_from_another_epoch_starts_again` |
+| 31 | Applying a sync to a device's copy leaves it holding exactly the server's recipes: deletions before changes, and a full response replaces everything. | `frontend/src/lib/sync.test.ts` "invariant 31: …" (three tests) |
 
 ## Where it runs
 
@@ -139,6 +143,24 @@ The app is a PWA. On the house wifi, open `https://recipes.julianjelfs.co.uk`, t
 
 Install from the house address rather than the tailnet one. A PWA is installed per origin,
 so installing both gives you two separate apps with two separate caches.
+
+### Away from home
+
+The installed app works off the house wifi for everything that only reads: browsing,
+search, filters, cooking mode and the shopping list. Each device keeps its own copy of the
+whole library in IndexedDB and searches that, so there is no server-side search at all. A
+service worker caches the app's own files so it opens with no network.
+
+The copy stays current through `GET /api/sync?since=<revision>&epoch=<epoch>`. SQLite
+triggers stamp every change to a recipe or its parts with the next revision and record
+every deletion, so a sync returns only the recipes changed or deleted since the device last
+looked. A device syncs when the app opens, when it comes back into view, every five minutes
+and after every change made through it. Each device needs to open the app once on the house
+wifi to get its first copy. Adding, creating and editing still need the Pi.
+
+A migration bumps the epoch, which makes every device fetch the whole library again. A
+migration that rebuilds a table must recreate that table's triggers from
+`migrations/006_sync.sql`.
 
 The icons come from one drawing in `frontend/scripts/icons.mjs`. After changing it, run
 `node scripts/icons.mjs` in `frontend/` and commit what it writes to `static/`.

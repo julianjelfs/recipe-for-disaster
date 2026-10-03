@@ -1,4 +1,4 @@
-import { error } from '@sveltejs/kit';
+import { ready, sync } from './library.svelte';
 
 export const UNITS = [
 	'g', 'kg', 'ml', 'l', 'tsp', 'tbsp',
@@ -73,12 +73,6 @@ export interface RecipeSummary {
 	created_at: string;
 }
 
-export interface RecipePage {
-	recipes: RecipeSummary[];
-	/** Every recipe that matches, not just the ones on this page. */
-	total: number;
-}
-
 export interface FacetValue {
 	value: string;
 	count: number;
@@ -146,22 +140,14 @@ export function toApiError(e: unknown): ApiError {
 	return e instanceof ApiError ? e : new ApiError(0, String(e));
 }
 
-/** Await an API call in a load function, turning an ApiError into SvelteKit's error page. */
-export async function orErrorPage<T>(promise: Promise<T>): Promise<T> {
-	try {
-		return await promise;
-	} catch (e) {
-		if (e instanceof ApiError) error(e.status || 503, e.message);
-		throw e;
-	}
-}
-
-type Fetch = typeof fetch;
-
-async function request<T>(path: string, init: RequestInit = {}, fetcher: Fetch = fetch): Promise<T> {
+/**
+ * Every call here writes, so each one brings this device's copy of the library up to date before
+ * returning: a page that navigates to the result finds it. Reads come from the copy, not the API.
+ */
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 	let response: Response;
 	try {
-		response = await fetcher(`/api${path}`, {
+		response = await fetch(`/api${path}`, {
 			...init,
 			headers: { 'Content-Type': 'application/json', ...init.headers }
 		});
@@ -175,6 +161,9 @@ async function request<T>(path: string, init: RequestInit = {}, fetcher: Fetch =
 		const message = typeof detail?.message === 'string' ? detail.message : `Request failed (HTTP ${response.status}).`;
 		throw new ApiError(response.status, message, Array.isArray(detail?.errors) ? detail.errors : []);
 	}
+	// Loaded first, or the saved copy arriving late would overwrite the one this sync brings.
+	await ready();
+	await sync();
 	return body as T;
 }
 
@@ -184,28 +173,6 @@ export function importRecipe(url: string): Promise<Recipe> {
 
 export function createRecipe(brief: string): Promise<Recipe> {
 	return request<Recipe>('/create', { method: 'POST', body: JSON.stringify({ brief }) });
-}
-
-/** How many recipes the home page asks for at a time. The API allows up to 100. */
-export const PAGE_SIZE = 48;
-
-export function searchRecipes(
-	params: URLSearchParams,
-	{ offset = 0, limit = PAGE_SIZE } = {},
-	fetcher?: Fetch
-): Promise<RecipePage> {
-	const query = new URLSearchParams(params);
-	query.set('offset', String(offset));
-	query.set('limit', String(limit));
-	return request<RecipePage>(`/recipes?${query}`, {}, fetcher);
-}
-
-export function getFacets(fetcher?: Fetch): Promise<Facets> {
-	return request<Facets>('/facets', {}, fetcher);
-}
-
-export function getRecipe(id: number | string, fetcher?: Fetch): Promise<Recipe> {
-	return request<Recipe>(`/recipes/${id}`, {}, fetcher);
 }
 
 export function updateRecipe(id: number, edit: RecipeEdit): Promise<Recipe> {

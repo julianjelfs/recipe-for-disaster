@@ -131,7 +131,7 @@ def database_at_4(tmp_path):
 def counts(conn: sqlite3.Connection) -> dict[str, int]:
     return {
         table: conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
-        for table in ("recipes", "ingredients", "steps", "step_ingredients", "tags", "recipe_search", "claude_usage")
+        for table in ("recipes", "ingredients", "steps", "step_ingredients", "tags", "claude_usage")
     }
 
 
@@ -183,4 +183,16 @@ def test_migrating_twice_changes_nothing(database_at_4):
     after_first = counts(conn)
     db.migrate(conn)
     assert counts(conn) == after_first
+    conn.close()
+
+
+def test_migrating_stamps_existing_recipes_for_sync(database_at_4):
+    """Existing recipes get revisions no higher than the library's, so a device's first sync finds them all."""
+    conn = db.connect(database_at_4)
+    db.migrate(conn)
+
+    library = conn.execute("SELECT revision FROM library_revision").fetchone()[0]
+    [recipe] = conn.execute("SELECT revision FROM recipes").fetchall()
+    assert 0 < recipe[0] <= library
+    assert conn.execute("SELECT count(*) FROM sqlite_master WHERE name = 'recipe_search'").fetchone()[0] == 0
     conn.close()

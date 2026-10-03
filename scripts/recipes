@@ -33,7 +33,7 @@ case "${1:-open}" in
 			else
 				printf "api       : NOT responding\n"
 			fi
-			printf "recipes   : %s\n" "$(curl -sf -m 5 http://127.0.0.1:8010/api/recipes | python3 -c "import sys,json; d=json.load(sys.stdin); r=d.get(\"recipes\",d) if isinstance(d,dict) else d; print(len(r))" 2>/dev/null || echo "?")"
+			printf "recipes   : %s\n" "$(curl -sf -m 5 http://127.0.0.1:8010/api/sync | python3 -c "import sys,json; print(len(json.load(sys.stdin)[\"changed\"]))" 2>/dev/null || echo "?")"
 			printf "certificate: expires %s\n" "$(echo | openssl s_client -connect 127.0.0.1:443 -servername recipes.julianjelfs.co.uk 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)"
 			n=$(ls -1 ~/recipe-backups/recipes-*.db 2>/dev/null | wc -l | tr -d " ")
 			if [ "$n" = 0 ]; then

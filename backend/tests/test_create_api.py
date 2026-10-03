@@ -18,7 +18,7 @@ def test_api_create_returns_the_new_recipe(api, conn):
     assert body["prompt"] == BRIEF
     assert body["source_url"] is None and body["source_domain"] is None
 
-    listed = http.get("/api/recipes").json()["recipes"]
+    listed = http.get("/api/sync").json()["changed"]
     assert [(r["title"], r["origin"], r["source_domain"]) for r in listed] == [
         ("Anchovy and garlic spaghetti", "created", None)
     ]

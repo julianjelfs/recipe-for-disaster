@@ -1,7 +1,9 @@
-import { getFacets, orErrorPage, searchRecipes } from '$lib/api';
+import { ready, recipes } from '$lib/library.svelte';
+import { facets, search } from '$lib/search';
 import type { PageLoad } from './$types';
 
-export const load: PageLoad = async ({ url, fetch }) => {
-	const [recipes, facets] = await orErrorPage(Promise.all([searchRecipes(url.searchParams, {}, fetch), getFacets(fetch)]));
-	return { page: recipes, facets };
+export const load: PageLoad = async ({ url }) => {
+	await ready();
+	const library = recipes();
+	return { results: search(library, url.searchParams), facets: facets(library) };
 };
