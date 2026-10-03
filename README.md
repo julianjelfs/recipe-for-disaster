@@ -15,6 +15,12 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 ## Running in development
 
+`scripts/recipes dev` copies the newest backup to `backend/dev.db`, starts both servers below
+against it and opens the app. The copy is replaced on every start, so nothing done locally
+survives. Vite also prints a Network URL that a phone on the same wifi can open. Ctrl-C stops both.
+
+To run the servers by hand:
+
 ```sh
 cd backend && uv run uvicorn app.main:app --reload --port 8011   # API; the service has 8010, Triad Trainer 8000
 cd frontend && pnpm dev                                  # app on http://localhost:5173, proxies /api

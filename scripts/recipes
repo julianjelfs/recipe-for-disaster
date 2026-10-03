@@ -95,6 +95,24 @@ case "${1:-open}" in
 
 	pull) bash "$ROOT/deploy/pull-backups.sh" ;;
 
+	dev)
+		# Try a change on this laptop against real recipes without touching the Pi. The API gets
+		# a fresh copy of the newest backup on every start, so anything done locally (edits,
+		# deletes, test imports) is thrown away next time. backend/recipes.db is left alone.
+		backup="$(ls -1t "$HOME/Backups/recipe-for-disaster"/recipes-*.db 2>/dev/null | head -1)"
+		[ -n "$backup" ] || { echo "no backups in ~/Backups/recipe-for-disaster; run: recipes pull" >&2; exit 1; }
+		dev_db="$ROOT/backend/dev.db"
+		# A leftover write-ahead log from the last run would be replayed onto the new copy.
+		rm -f "$dev_db" "$dev_db-wal" "$dev_db-shm"
+		cp "$backup" "$dev_db"
+		echo "==> using $(basename "$backup")"
+		(cd "$ROOT/backend" && RECIPE_DB_PATH="$dev_db" uv run uvicorn app.main:app --reload --port 8011) &
+		api=$!
+		trap 'kill "$api" 2>/dev/null' EXIT
+		# --host so a phone on the home wifi can open the Network URL Vite prints.
+		cd "$ROOT/frontend" && pnpm dev --host --open
+		;;
+
 	*)
 		cat <<'USAGE'
 recipes: the family recipe library, running on the Pi
@@ -107,6 +125,7 @@ recipes: the family recipe library, running on the Pi
   recipes caddylogs    follow the Caddy log
   recipes backup       take a backup now and pull it to this laptop
   recipes pull         pull existing backups to this laptop
+  recipes dev          run it here on a copy of the newest backup, for trying changes
   recipes ssh          shell onto the Pi
   recipes start|stop|restart
 USAGE
