@@ -176,7 +176,7 @@
 	{/if}
 
 	<div class="columns">
-		<section>
+		<section class="ingredients-column">
 			<div class="ingredients-heading">
 				<h2>Ingredients</h2>
 				<ServingsControl servings={recipe.servings} {scale} onchange={setScale} />
@@ -322,9 +322,26 @@
 		gap: 2rem;
 	}
 
+	/* Ingredients stay in view while you read down a long method. A list taller than the
+	   screen scrolls on its own. */
+	.ingredients-column {
+		position: sticky;
+		top: 1rem;
+		align-self: start;
+		max-height: calc(100dvh - 2rem);
+		overflow-y: auto;
+	}
+
 	@media (max-width: 40rem) {
 		.columns {
 			grid-template-columns: minmax(0, 1fr);
+		}
+
+		/* Stacked on a phone, so the page scrolls them together as before. */
+		.ingredients-column {
+			position: static;
+			max-height: none;
+			overflow-y: visible;
 		}
 	}
 
