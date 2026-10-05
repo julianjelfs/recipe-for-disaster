@@ -37,7 +37,7 @@ hive.julianjelfs.co.uk {
 	reverse_proxy 127.0.0.1:8030
 }
 
-barrenone.julianjelfs.co.uk {
+tab.julianjelfs.co.uk {
 	import house
 	# A piece with its hand states and grips is chunky JSON.
 	encode zstd gzip
