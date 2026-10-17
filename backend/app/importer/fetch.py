@@ -9,6 +9,7 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/128.0 Safari/537.36"
 )
 TRACKING_PARAMS = {"fbclid", "gclid", "mc_cid", "mc_eid", "ref", "ref_src", "igshid"}
+BLOCKED_STATUSES = (401, 403, 429)
 
 
 class InvalidUrl(ValueError):
@@ -32,18 +33,27 @@ def canonicalise_url(url: str) -> str:
     return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path or "/", urlencode(query), ""))
 
 
-def fetch_html(url: str) -> str:
+def fetch_html(url: str, client: httpx.Client | None = None) -> str:
+    with client or httpx.Client(follow_redirects=True, timeout=15) as http:
+        response = _get(http, url, USER_AGENT)
+        if response.status_code in BLOCKED_STATUSES:
+            # Cloudflare challenges a browser User-Agent that lacks a browser's fingerprint, but some
+            # sites (janespatisserie.com) let a client that says what it is through. Ask again as httpx.
+            response = _get(http, url, f"python-httpx/{httpx.__version__}")
+        if response.status_code in BLOCKED_STATUSES:
+            raise FetchError(f"{url} returned HTTP {response.status_code}. The site blocks automated fetches.")
+        if response.status_code >= 400:
+            raise FetchError(f"{url} returned HTTP {response.status_code}.")
+        return response.text
+
+
+def _get(http: httpx.Client, url: str, user_agent: str) -> httpx.Response:
     headers = {
-        "User-Agent": USER_AGENT,
+        "User-Agent": user_agent,
         "Accept": "text/html,application/xhtml+xml",
         "Accept-Language": "en-GB,en;q=0.9",
     }
     try:
-        response = httpx.get(url, headers=headers, follow_redirects=True, timeout=15)
+        return http.get(url, headers=headers)
     except httpx.HTTPError as error:
         raise FetchError(f"Could not fetch {url}: {error}") from error
-    if response.status_code in (401, 403, 429):
-        raise FetchError(f"{url} returned HTTP {response.status_code}. The site blocks automated fetches.")
-    if response.status_code >= 400:
-        raise FetchError(f"{url} returned HTTP {response.status_code}.")
-    return response.text
