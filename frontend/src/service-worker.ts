@@ -25,8 +25,8 @@ const SHELL_FILES = ['/', ...build, ...files];
 // Kept across versions. A photo's id is never reused, so its bytes never change.
 const PHOTOS = 'photos';
 
-// Off the home network the Pi's name doesn't resolve, which fails fast. A weak signal can hang
-// instead, so give up after this long and use the cached page.
+// Off the wifi and the tailnet, the Pi's name still resolves to its home address, which may
+// fail fast or hang, as may a weak signal. Give up after this long and use the cached page.
 const NETWORK_TIMEOUT_MS = 4000;
 // After a miss, skip the network for a while so every navigation doesn't wait for another failure.
 const UNREACHABLE_FOR_MS = 30_000;

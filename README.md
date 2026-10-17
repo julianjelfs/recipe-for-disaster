@@ -125,8 +125,11 @@ sharp, which is what keeps a 2GB board comfortable.
 
 The certificate comes over a DNS-01 challenge, so nothing is exposed to the internet and
 no port is open on the router. Caddy renews it every 60 days on its own. Away from the
-house the app is still on the tailnet at `https://pi.tail50bfbf.ts.net:8445`, and
-`recipes url` picks whichever of the two applies.
+house the same address works on any tailnet device with subnet routes on (the default on
+macOS, iOS, Android and Windows): the names point at the Pi's home address,
+192.168.68.69, and the Pi advertises that one address as a Tailscale subnet route. The
+older tailnet address, `https://pi.tail50bfbf.ts.net:8445`, still works too, and
+`recipes url` picks whichever applies.
 
 To set a Pi up from scratch, or to put the units and Caddyfile back after changing them,
 run `./deploy/install-pi.sh` on the Pi. It is safe to re-run and never touches the
@@ -150,7 +153,8 @@ so installing both gives you two separate apps with two separate caches.
 
 ### Away from home
 
-The installed app works off the house wifi for everything that only reads: browsing,
+On the tailnet the app works away from home exactly as it does at home. Off the tailnet
+too, the installed app still works for everything that only reads: browsing,
 search, filters, cooking mode and the shopping list. Each device keeps its own copy of the
 whole library in IndexedDB and searches that, so there is no server-side search at all. A
 service worker caches the app's own files so it opens with no network.
@@ -159,8 +163,8 @@ The copy stays current through `GET /api/sync?since=<revision>&epoch=<epoch>`. S
 triggers stamp every change to a recipe or its parts with the next revision and record
 every deletion, so a sync returns only the recipes changed or deleted since the device last
 looked. A device syncs when the app opens, when it comes back into view, every five minutes
-and after every change made through it. Each device needs to open the app once on the house
-wifi to get its first copy. Adding, creating and editing still need the Pi.
+and after every change made through it. Each device needs to open the app once at home or on
+the tailnet to get its first copy. Adding, creating and editing still need the Pi.
 
 A migration bumps the epoch, which makes every device fetch the whole library again. A
 migration that rebuilds a table must drop the sync triggers first and recreate them after, as
