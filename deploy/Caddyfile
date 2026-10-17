@@ -43,3 +43,10 @@ tab.julianjelfs.co.uk {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:8040
 }
+
+apps.julianjelfs.co.uk {
+	import house
+	# The launcher's bundle is three.js and two fonts; worth squeezing.
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8050
+}
